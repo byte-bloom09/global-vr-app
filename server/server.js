@@ -4,13 +4,18 @@ const mongoose = require("mongoose");
 require("dotenv").config();
 
 const authRoutes = require("./routes/authRoutes");
+const destinationRoutes = require("./routes/destinationRoutes"); // ✅ ADD THIS
+const favoriteRoutes = require("./routes/favoriteRoutes");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
+// Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/destinations", destinationRoutes); // ✅ ADD THIS
+app.use("/api/favorites", favoriteRoutes);
 
 app.get("/", (req, res) => {
   res.send("Global VR Backend Running 🚀");
