@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Taj Mahal VR — Global VR</title>
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { overflow:hidden; background:#000; font-family:'Segoe UI',sans-serif; }
+
+    #renderCanvas {
+      width:100vw; height:100vh; display:block;
+      touch-action:none;
+    }
+
+    /* HUD */
+    #hud {
+      position:fixed; top:0; left:0; right:0; z-index:100;
+      display:flex; align-items:center; justify-content:space-between;
+      padding:1rem 1.5rem;
+      background:linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+      pointer-events:none;
+    }
+    #hud-left, #hud-right { pointer-events:all; display:flex; gap:.75rem; align-items:center; }
+    .hud-btn {
+      background:rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.15);
+      color:#fff; padding:.5rem 1.1rem; border-radius:8px;
+      font-size:.85rem; cursor:pointer; backdrop-filter:blur(10px);
+      transition:all .2s; font-family:inherit;
+    }
+    .hud-btn:hover { background:rgba(255,215,0,0.2); border-color:rgba(255,215,0,0.4); color:#ffd700; }
+    #hud-title {
+      font-size:1.1rem; font-weight:700; color:#ffd700;
+      letter-spacing:.05em; text-shadow:0 0 20px rgba(255,215,0,0.5);
+      font-family:'Georgia',serif;
+    }
+    #hud-sub { font-size:.7rem; color:rgba(255,255,255,0.5); text-align:center; margin-top:.15rem; }
+
+    /* CONTROLS PANEL */
+    #controls-panel {
+      position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%);
+      z-index:100; display:flex; gap:.5rem; align-items:center;
+      background:rgba(0,0,0,0.6); backdrop-filter:blur(12px);
+      border:1px solid rgba(255,255,255,0.1); border-radius:50px;
+      padding:.5rem 1.25rem;
+    }
+    .ctrl-key {
+      background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
+      color:#fff; padding:.25rem .6rem; border-radius:5px;
+      font-size:.75rem; font-weight:600; font-family:monospace;
+    }
+    .ctrl-label { font-size:.75rem; color:rgba(255,255,255,0.5); margin:0 .5rem 0 .25rem; }
+
+    /* CROSSHAIR */
+    #crosshair {
+      position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+      width:20px; height:20px; pointer-events:none; z-index:100;
+    }
+    #crosshair::before, #crosshair::after {
+      content:''; position:absolute; background:rgba(255,255,255,0.7);
+      border-radius:2px;
+    }
+    #crosshair::before { width:2px; height:100%; left:50%; transform:translateX(-50%); }
+    #crosshair::after { width:100%; height:2px; top:50%; transform:translateY(-50%); }
+
+    /* LOADING SCREEN */
+    #loading-screen {
+      position:fixed; inset:0; z-index:999;
+      background:linear-gradient(135deg, #0a0a0f 0%, #1a1208 50%, #0d0a05 100%);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      transition:opacity .8s ease;
+    }
+    #loading-screen.hidden { opacity:0; pointer-events:none; }
+    .loading-title {
+      font-family:'Georgia',serif; font-size:2.5rem; color:#ffd700;
+      text-shadow:0 0 40px rgba(255,215,0,0.4); margin-bottom:.5rem;
+    }
+    .loading-sub { color:rgba(255,255,255,0.4); font-size:.9rem; margin-bottom:2.5rem; letter-spacing:.1em; }
+    .loading-bar-wrap { width:280px; height:3px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden; }
+    .loading-bar { height:100%; width:0%; background:linear-gradient(to right,#ffd700,#ff8c00); border-radius:3px; transition:width .3s ease; }
+    .loading-tip { margin-top:1.5rem; font-size:.75rem; color:rgba(255,255,255,0.3); text-align:center; }
+
+    /* LOCATION POPUP */
+    #location-popup {
+      position:fixed; bottom:5rem; left:50%; transform:translateX(-50%);
+      z-index:100; background:rgba(0,0,0,0.75); backdrop-filter:blur(10px);
+      border:1px solid rgba(255,215,0,0.3); border-radius:10px;
+      padding:.6rem 1.2rem; color:#ffd700; font-size:.85rem;
+      opacity:0; transition:opacity .4s; pointer-events:none;
+      font-family:'Georgia',serif;
+    }
+    #location-popup.show { opacity:1; }
+
+    /* MINIMAP */
+    #minimap {
+      position:fixed; bottom:5rem; right:1.5rem; z-index:100;
+      width:120px; height:120px;
+      background:rgba(0,0,0,0.6); backdrop-filter:blur(8px);
+      border:1px solid rgba(255,215,0,0.2); border-radius:10px;
+      overflow:hidden;
+    }
+    #minimap canvas { width:100%; height:100%; }
+    #minimap-label { position:absolute; bottom:4px; left:0; right:0; text-align:center; font-size:.6rem; color:rgba(255,215,0,0.5); }
+
+    /* CLICK TO START overlay */
+    #click-to-start {
+      position:fixed; inset:0; z-index:98;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      background:rgba(0,0,0,0.5); backdrop-filter:blur(4px);
+      cursor:pointer; transition:opacity .4s;
+    }
+    #click-to-start.hidden { opacity:0; pointer-events:none; }
+    #click-to-start h2 { font-family:'Georgia',serif; font-size:1.8rem; color:#ffd700; margin-bottom:.5rem; }
+    #click-to-start p { color:rgba(255,255,255,0.6); font-size:.9rem; }
+    .pulse-ring {
+      width:80px; height:80px; border:2px solid rgba(255,215,0,0.5);
+      border-radius:50%; margin-bottom:1.5rem;
+      animation:pulse 2s ease infinite;
+      display:flex; align-items:center; justify-content:center;
+      font-size:2rem;
+    }
+    @keyframes pulse {
+      0%,100% { transform:scale(1); opacity:.7; }
+      50% { transform:scale(1.15); opacity:1; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div id="loading-screen">
+  <div class="loading-title">🕌 Taj Mahal</div>
+  <div class="loading-sub">VIRTUAL REALITY EXPERIENCE</div>
+  <div class="loading-bar-wrap"><div class="loading-bar" id="loading-bar"></div></div>
+  <div class="loading-tip">Use WASD to walk · Mouse to look around · Click to lock cursor</div>
+</div>
+
+<!-- CLICK TO START -->
+<div id="click-to-start" class="hidden">
+  <div class="pulse-ring">🕌</div>
+  <h2>Enter the Taj Mahal</h2>
+  <p>Click anywhere to lock your cursor and start exploring</p>
+</div>
+
+<!-- CROSSHAIR -->
+<div id="crosshair"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="hud-left">
+    <button class="hud-btn" onclick="window.history.back()">← Back</button>
+  </div>
+  <div style="text-align:center;">
+    <div id="hud-title">🕌 Taj Mahal, Agra</div>
+    <div id="hud-sub">WASD to walk · Mouse to look · Click to lock cursor</div>
+  </div>
+  <div id="hud-right">
+    <button class="hud-btn" onclick="teleportToGarden()">🌿 Garden</button>
+    <button class="hud-btn" onclick="teleportToPool()">💧 Reflecting Pool</button>
+    <button class="hud-btn" onclick="teleportToInterior()">🏛 Interior</button>
+    <button class="hud-btn" onclick="toggleTimeOfDay()">🌗 Time</button>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div id="controls-panel">
+  <span class="ctrl-key">W</span><span class="ctrl-label">Forward</span>
+  <span class="ctrl-key">S</span><span class="ctrl-label">Back</span>
+  <span class="ctrl-key">A</span><span class="ctrl-label">Left</span>
+  <span class="ctrl-key">D</span><span class="ctrl-label">Right</span>
+  <span class="ctrl-label" style="margin-left:.5rem;">🖱 Mouse to look</span>
+  <span class="ctrl-label">· ESC to release</span>
+</div>
+
+<!-- LOCATION POPUP -->
+<div id="location-popup"></div>
+
+<!-- CANVAS -->
+<canvas id="renderCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('renderCanvas');
+const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer:true, stencil:true });
+
+let scene, camera, isDay = true, timeOfDay = 0;
+let loadProgress = 0;
+
+function updateLoading(pct, msg) {
+  document.getElementById('loading-bar').style.width = pct + '%';
+}
+
+function showLocation(msg, duration=3000) {
+  const el = document.getElementById('location-popup');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// ── TELEPORT FUNCTIONS ──────────────────────────────────
+function teleportToGarden() {
+  camera.position = new BABYLON.Vector3(0, 2, 35);
+  camera.rotation = new BABYLON.Vector3(0.1, Math.PI, 0);
+  showLocation('🌿 Charbagh Gardens — The Four-Quadrant Paradise Garden');
+}
+function teleportToPool() {
+  camera.position = new BABYLON.Vector3(0, 2, 12);
+  camera.rotation = new BABYLON.Vector3(0.05, Math.PI, 0);
+  showLocation('💧 Hauz-i-Kausar — The Reflecting Pool of Abundance');
+}
+function teleportToMain() {
+  camera.position = new BABYLON.Vector3(0, 3, -5);
+  camera.rotation = new BABYLON.Vector3(0.1, 0, 0);
+  showLocation('🕌 Taj Mahal — Built by Emperor Shah Jahan, 1632–1653');
+}
+function teleportToInterior() {
+  camera.position = new BABYLON.Vector3(0, 3, -2);
+  camera.rotation = new BABYLON.Vector3(0.1, Math.PI, 0);
+  showLocation('🏛 Inner Chamber — The Cenotaph of Mumtaz Mahal');
+}
+
+function toggleTimeOfDay() {
+  isDay = !isDay;
+  updateSkyAndLight();
+  showLocation(isDay ? '☀️ Golden Hour — Sunset at the Taj' : '🌙 Moonlight — The Taj at Night');
+}
+
+function updateSkyAndLight() {
+  if (!scene) return;
+  const sky = scene.getMeshByName('skyDome');
+  const sun = scene.getLightByName('sunLight');
+  const ambient = scene.getLightByName('ambientLight');
+
+  if (isDay) {
+    if (sky) sky.material.diffuseColor = new BABYLON.Color3(0.53, 0.81, 0.98);
+    if (sun) { sun.intensity = 1.2; sun.diffuse = new BABYLON.Color3(1, 0.95, 0.8); }
+    if (ambient) { ambient.intensity = 0.4; ambient.diffuse = new BABYLON.Color3(0.9,0.85,0.7); }
+  } else {
+    if (sky) sky.material.diffuseColor = new BABYLON.Color3(0.02, 0.03, 0.12);
+    if (sun) { sun.intensity = 0.15; sun.diffuse = new BABYLON.Color3(0.3, 0.4, 0.9); }
+    if (ambient) { ambient.intensity = 0.08; ambient.diffuse = new BABYLON.Color3(0.2,0.25,0.5); }
+  }
+}
+
+// ── MATERIAL HELPERS ────────────────────────────────────
+function marbMat(name, r=1,g=1,b=1, spec=0.8) {
+  const m = new BABYLON.StandardMaterial(name, scene);
+  m.diffuseColor = new BABYLON.Color3(r,g,b);
+  m.specularColor = new BABYLON.Color3(spec,spec,spec);
+  m.specularPower = 64;
+  return m;
+}
+function stoneMat(name, r,g,b) {
+  const m = new BABYLON.StandardMaterial(name, scene);
+  m.diffuseColor = new BABYLON.Color3(r,g,b);
+  m.specularColor = new BABYLON.Color3(0.1,0.1,0.1);
+  return m;
+}
+function waterMat(name) {
+  const m = new BABYLON.StandardMaterial(name, scene);
+  m.diffuseColor = new BABYLON.Color3(0.1,0.4,0.6);
+  m.specularColor = new BABYLON.Color3(0.8,0.9,1.0);
+  m.specularPower = 128;
+  m.alpha = 0.75;
+  return m;
+}
+function goldMat(name) {
+  const m = new BABYLON.StandardMaterial(name, scene);
+  m.diffuseColor = new BABYLON.Color3(0.8,0.6,0.1);
+  m.specularColor = new BABYLON.Color3(1,0.9,0.3);
+  m.specularPower = 96;
+  m.emissiveColor = new BABYLON.Color3(0.1,0.07,0.0);
+  return m;
+}
+function grassMat(name) {
+  const m = new BABYLON.StandardMaterial(name, scene);
+  m.diffuseColor = new BABYLON.Color3(0.2,0.45,0.15);
+  m.specularColor = new BABYLON.Color3(0,0,0);
+  return m;
+}
+
+// ── BUILD MINARET ────────────────────────────────────────
+function buildMinaret(x, z, mat) {
+  const base = BABYLON.MeshBuilder.CreateCylinder('mn_base', { diameter:2.2, height:1.2, tessellation:16 }, scene);
+  base.position.set(x, 0.6, z); base.material = mat;
+
+  const shaft = BABYLON.MeshBuilder.CreateCylinder('mn_shaft', { diameter:1.4, height:22, tessellation:16 }, scene);
+  shaft.position.set(x, 12, z); shaft.material = mat;
+
+  // Balconies
+  for (let i=0; i<3; i++) {
+    const bal = BABYLON.MeshBuilder.CreateCylinder(`mn_bal${i}`, { diameter:2.2, height:0.5, tessellation:16 }, scene);
+    bal.position.set(x, 6+i*7, z); bal.material = mat;
+  }
+
+  // Dome cap
+  const cap = BABYLON.MeshBuilder.CreateSphere('mn_cap', { diameter:2, segments:10 }, scene);
+  cap.position.set(x, 24, z); cap.scaling.y = 1.3; cap.material = mat;
+
+  // Spire
+  const spire = BABYLON.MeshBuilder.CreateCylinder('mn_spire', { diameterTop:0.05, diameterBottom:0.3, height:3.5, tessellation:8 }, scene);
+  spire.position.set(x, 26.5, z); spire.material = goldMat('goldSpire'+x);
+
+  // Crescent
+  const cres = BABYLON.MeshBuilder.CreateTorus('mn_cres', { diameter:0.6, thickness:0.1, tessellation:24 }, scene);
+  cres.position.set(x, 28.2, z); cres.rotation.x = Math.PI/2; cres.material = goldMat('goldCres'+x);
+}
+
+// ── BUILD ARCH ───────────────────────────────────────────
+function buildArch(name, x, y, z, w, h, d, mat, rotY=0) {
+  // Left pillar
+  const lp = BABYLON.MeshBuilder.CreateBox(name+'_lp', { width:w*0.25, height:h, depth:d }, scene);
+  lp.position.set(x - w*0.35, y+h/2, z); lp.rotation.y=rotY; lp.material=mat;
+  // Right pillar
+  const rp = BABYLON.MeshBuilder.CreateBox(name+'_rp', { width:w*0.25, height:h, depth:d }, scene);
+  rp.position.set(x + w*0.35, y+h/2, z); rp.rotation.y=rotY; rp.material=mat;
+  // Lintel
+  const lin = BABYLON.MeshBuilder.CreateBox(name+'_lin', { width:w, height:h*0.2, depth:d }, scene);
+  lin.position.set(x, y+h*0.9, z); lin.rotation.y=rotY; lin.material=mat;
+  // Arch torus half
+  const arc = BABYLON.MeshBuilder.CreateTorus(name+'_arc', { diameter:w*0.7, thickness:w*0.12, tessellation:24 }, scene);
+  arc.position.set(x, y+h*0.7, z); arc.rotation.x=Math.PI/2; arc.rotation.y=rotY; arc.material=mat;
+}
+
+// ── MAIN SCENE ───────────────────────────────────────────
+async function createScene() {
+  scene = new BABYLON.Scene(engine);
+  scene.clearColor = new BABYLON.Color4(0.53,0.81,0.98,1);
+  scene.gravity = new BABYLON.Vector3(0, -0.9, 0);
+  scene.collisionsEnabled = true;
+  scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+  scene.fogDensity = 0.008;
+  scene.fogColor = new BABYLON.Color3(0.8,0.85,0.9);
+
+  updateLoading(10);
+
+  // ── CAMERA ──
+  camera = new BABYLON.UniversalCamera('cam', new BABYLON.Vector3(0,2.2,38), scene);
+  camera.rotation = new BABYLON.Vector3(0.1, Math.PI, 0);
+  camera.fov = 1.1;
+  camera.minZ = 0.1;
+  camera.maxZ = 500;
+  camera.speed = 0.35;
+  camera.angularSensibility = 800;
+  camera.applyGravity = true;
+  camera.checkCollisions = true;
+  camera.ellipsoid = new BABYLON.Vector3(0.5, 1.1, 0.5);
+  camera.keysUp = [87, 38];    // W, Up
+  camera.keysDown = [83, 40];  // S, Down
+  camera.keysLeft = [65, 37];  // A, Left
+  camera.keysRight = [68, 39]; // D, Right
+  camera.attachControl(canvas, true);
+
+  // ── LIGHTS ──
+  const sun = new BABYLON.DirectionalLight('sunLight', new BABYLON.Vector3(-0.5,-1,-0.3), scene);
+  sun.intensity = 1.2;
+  sun.diffuse = new BABYLON.Color3(1,0.95,0.8);
+  sun.position = new BABYLON.Vector3(50,80,50);
+
+  const ambient = new BABYLON.HemisphericLight('ambientLight', new BABYLON.Vector3(0,1,0), scene);
+  ambient.intensity = 0.4;
+  ambient.diffuse = new BABYLON.Color3(0.9,0.85,0.7);
+  ambient.groundColor = new BABYLON.Color3(0.3,0.25,0.15);
+
+  // Point lights inside dome
+  const domeLight = new BABYLON.PointLight('domeLight', new BABYLON.Vector3(0,10,-2), scene);
+  domeLight.intensity = 0.6;
+  domeLight.diffuse = new BABYLON.Color3(1,0.9,0.7);
+  domeLight.range = 25;
+
+  updateLoading(20);
+
+  // ── MATERIALS ──
+  const marbleMat = marbMat('marble', 0.97,0.95,0.92);
+  const marble2 = marbMat('marble2', 0.88,0.85,0.80, 0.5);
+  const sandMat = stoneMat('sand', 0.76,0.65,0.45);
+  const redSandMat = stoneMat('redSand', 0.65,0.35,0.2);
+  const grassM = grassMat('grass');
+  const waterM = waterMat('water');
+  const goldM = goldMat('gold');
+  const darkMarble = marbMat('darkMarble', 0.15,0.12,0.1, 0.3);
+  const interiorMat = marbMat('interior', 0.92,0.88,0.82);
+
+  updateLoading(30);
+
+  // ── SKY DOME ──
+  const skyDome = BABYLON.MeshBuilder.CreateSphere('skyDome', { diameter:400, sideOrientation:BABYLON.Mesh.BACKSIDE }, scene);
+  const skyMat = new BABYLON.StandardMaterial('skyMat', scene);
+  skyMat.diffuseColor = new BABYLON.Color3(0.53,0.81,0.98);
+  skyMat.emissiveColor = new BABYLON.Color3(0.4,0.65,0.85);
+  skyMat.backFaceCulling = false;
+  skyDome.material = skyMat;
+
+  // ── GROUND PLAZA ──
+  const ground = BABYLON.MeshBuilder.CreateGround('ground', { width:120, height:120 }, scene);
+  ground.material = sandMat;
+  ground.checkCollisions = true;
+
+  // Garden grass quadrants
+  const quadrants = [
+    [16,18],[16,-18],[-16,18],[-16,-18]
+  ];
+  quadrants.forEach((q,i) => {
+    const grass = BABYLON.MeshBuilder.CreateGround('grass'+i, { width:24, height:28 }, scene);
+    grass.position.set(q[0], 0.01, q[1]);
+    grass.material = grassM;
+  });
+
+  updateLoading(40);
+
+  // ── MAIN PLATFORM (Chabutra) ──
+  const platform = BABYLON.MeshBuilder.CreateBox('platform', { width:55, height:2.5, depth:55 }, scene);
+  platform.position.set(0, 1.25, -5);
+  platform.material = marbleMat;
+  platform.checkCollisions = true;
+
+  // Steps up to platform
+  for (let i=0; i<5; i++) {
+    const step = BABYLON.MeshBuilder.CreateBox('step'+i, { width:20, height:0.4, depth:1.2 }, scene);
+    step.position.set(0, i*0.4, 22.5 - i*1.2);
+    step.material = marbleMat;
+    step.checkCollisions = true;
+  }
+
+  // ── MAIN TAJ MAHAL BUILDING ──
+  // Base cube
+  const mainBase = BABYLON.MeshBuilder.CreateBox('mainBase', { width:26, height:4, depth:26 }, scene);
+  mainBase.position.set(0, 4.5, -5);
+  mainBase.material = marbleMat;
+  mainBase.checkCollisions = true;
+
+  // Second tier
+  const tier2 = BABYLON.MeshBuilder.CreateBox('tier2', { width:20, height:4, depth:20 }, scene);
+  tier2.position.set(0, 8.5, -5);
+  tier2.material = marbleMat;
+  tier2.checkCollisions = true;
+
+  // Third tier
+  const tier3 = BABYLON.MeshBuilder.CreateBox('tier3', { width:16, height:3, depth:16 }, scene);
+  tier3.position.set(0, 12, -5);
+  tier3.material = marbleMat;
+  tier3.checkCollisions = true;
+
+  // ── MAIN DOME ──
+  const mainDome = BABYLON.MeshBuilder.CreateSphere('mainDome', { diameter:13, segments:24 }, scene);
+  mainDome.position.set(0, 20, -5);
+  mainDome.scaling.y = 1.5;
+  mainDome.material = marbleMat;
+  mainDome.checkCollisions = true;
+
+  // Drum below dome
+  const drum = BABYLON.MeshBuilder.CreateCylinder('drum', { diameter:10, height:5, tessellation:24 }, scene);
+  drum.position.set(0, 15.5, -5);
+  drum.material = marbleMat;
+  drum.checkCollisions = true;
+
+  // Dome finial
+  const finial = BABYLON.MeshBuilder.CreateCylinder('finial', { diameterTop:0.1, diameterBottom:0.8, height:4.5, tessellation:16 }, scene);
+  finial.position.set(0, 29, -5);
+  finial.material = goldM;
+
+  const finialBall = BABYLON.MeshBuilder.CreateSphere('finialBall', { diameter:1.2 }, scene);
+  finialBall.position.set(0, 31.5, -5);
+  finialBall.material = goldM;
+
+  updateLoading(55);
+
+  // ── SMALLER CORNER DOMES ──
+  const cornerDomePos = [[-10,10],[-10,-20],[10,10],[10,-20]];
+  cornerDomePos.forEach((p,i) => {
+    const cd = BABYLON.MeshBuilder.CreateSphere('cdome'+i, { diameter:5.5, segments:16 }, scene);
+    cd.position.set(p[0], 16.5, p[1]-5); cd.scaling.y=1.3; cd.material=marbleMat;
+    const cdDrum = BABYLON.MeshBuilder.CreateCylinder('cddrum'+i, { diameter:4, height:2.5, tessellation:16 }, scene);
+    cdDrum.position.set(p[0], 14.5, p[1]-5); cdDrum.material=marbleMat;
+    const cdFin = BABYLON.MeshBuilder.CreateCylinder('cdfin'+i, { diameterTop:0.05, diameterBottom:0.3, height:2.5, tessellation:8 }, scene);
+    cdFin.position.set(p[0], 20, p[1]-5); cdFin.material=goldM;
+  });
+
+  // ── ARCHED FACADE ──
+  // Front arches
+  const archPositions = [-8, 0, 8];
+  archPositions.forEach((ax, i) => {
+    buildArch('frontArch'+i, ax, 2.5, 17.5, 4.5, 8, 1.5, marble2);
+  });
+
+  // Side arches
+  [-13, 13].forEach((ax, si) => {
+    buildArch('sideArch'+si, ax, 2.5, -5, 4.5, 7, 1.5, marble2, Math.PI/2);
+  });
+
+  // ── INTERIOR CHAMBER ──
+  const interiorFloor = BABYLON.MeshBuilder.CreateBox('iFloor', { width:18, height:0.3, depth:18 }, scene);
+  interiorFloor.position.set(0, 2.7, -5);
+  interiorFloor.material = darkMarble;
+  interiorFloor.checkCollisions = true;
+
+  // Interior walls (hollow box effect)
+  const iWalls = [
+    { w:18, h:10, d:0.5, x:0, z:4.5 },
+    { w:18, h:10, d:0.5, x:0, z:-14.5 },
+    { w:0.5, h:10, d:18, x:8.5, z:-5 },
+    { w:0.5, h:10, d:18, x:-8.5, z:-5 },
+  ];
+  iWalls.forEach((w,i) => {
+    const wall = BABYLON.MeshBuilder.CreateBox('iwall'+i, { width:w.w, height:w.h, depth:w.d }, scene);
+    wall.position.set(w.x, 2.5+w.h/2, w.z);
+    wall.material = interiorMat;
+    wall.checkCollisions = true;
+  });
+
+  // Cenotaph (tomb) in center
+  const cenotaphBase = BABYLON.MeshBuilder.CreateBox('cenoBase', { width:4, height:1, depth:4 }, scene);
+  cenotaphBase.position.set(0, 3.5, -5);
+  cenotaphBase.material = darkMarble;
+
+  const cenotaph = BABYLON.MeshBuilder.CreateBox('ceno', { width:2, height:2.5, depth:3.5 }, scene);
+  cenotaph.position.set(0, 5.25, -5);
+  cenotaph.material = marbMat('cenoMat', 0.8,0.75,0.7, 0.6);
+
+  const cenoTop = BABYLON.MeshBuilder.CreateSphere('cenoTop', { diameter:1.5 }, scene);
+  cenoTop.position.set(0, 7, -5); cenoTop.scaling.y=1.2;
+  cenoTop.material = goldM;
+
+  updateLoading(70);
+
+  // ── 4 MINARETS ──
+  buildMinaret(-27, 18, marbleMat);
+  buildMinaret(27, 18, marbleMat);
+  buildMinaret(-27, -28, marbleMat);
+  buildMinaret(27, -28, marbleMat);
+
+  // ── ENTRY GATEWAY (Darwaza-i-Rauza) ──
+  const gatewayBase = BABYLON.MeshBuilder.CreateBox('gateway', { width:22, height:18, depth:6 }, scene);
+  gatewayBase.position.set(0, 9, 52);
+  gatewayBase.material = redSandMat;
+  gatewayBase.checkCollisions = true;
+
+  // Gateway arch opening
+  const gateArch = BABYLON.MeshBuilder.CreateBox('gateArch', { width:8, height:12, depth:7 }, scene);
+  gateArch.position.set(0, 6, 52);
+  gateArch.material = stoneMat('gateInner', 0.3,0.2,0.15);
+  // Gateway towers
+  [-11, 11].forEach((gx, i) => {
+    const gt = BABYLON.MeshBuilder.CreateBox('gateTower'+i, { width:5, height:22, depth:5 }, scene);
+    gt.position.set(gx, 11, 52); gt.material = redSandMat; gt.checkCollisions=true;
+    const gtd = BABYLON.MeshBuilder.CreateSphere('gtdome'+i, { diameter:4 }, scene);
+    gtd.position.set(gx, 23.5, 52); gtd.scaling.y=1.2; gtd.material = marbleMat;
+  });
+
+  // ── REFLECTING POOL ──
+  const pool = BABYLON.MeshBuilder.CreateBox('pool', { width:6, height:0.4, depth:36 }, scene);
+  pool.position.set(0, 0.3, 18);
+  pool.material = waterM;
+
+  // Pool border
+  const poolBorderMat = stoneMat('poolBorder', 0.6,0.55,0.5);
+  [[3.5,18],[- 3.5,18]].forEach((p,i) => {
+    const pb = BABYLON.MeshBuilder.CreateBox('poolborder'+i, { width:0.8, height:0.6, depth:36 }, scene);
+    pb.position.set(p[0], 0.4, p[1]); pb.material = poolBorderMat; pb.checkCollisions=true;
+  });
+  // Pool end caps
+  [[0,0.8],[0,35.2]].forEach((p,i) => {
+    const pb = BABYLON.MeshBuilder.CreateBox('poolcap'+i, { width:7.5, height:0.6, depth:0.8 }, scene);
+    pb.position.set(p[0], 0.4, p[1]); pb.material = poolBorderMat;
+  });
+
+  // Animated pool ripple
+  let poolTime = 0;
+  scene.registerBeforeRender(() => {
+    poolTime += 0.02;
+    pool.material.alpha = 0.7 + Math.sin(poolTime)*0.05;
+  });
+
+  updateLoading(80);
+
+  // ── FOUNTAINS ──
+  const fountainPositions = [[0,8],[0,28],[-8,18],[8,18]];
+  fountainPositions.forEach((fp,i) => {
+    const fBase = BABYLON.MeshBuilder.CreateCylinder('fbase'+i, { diameter:1.5, height:0.5, tessellation:16 }, scene);
+    fBase.position.set(fp[0], 0.25, fp[1]); fBase.material = marbleMat;
+    const fRim = BABYLON.MeshBuilder.CreateTorus('frim'+i, { diameter:1.4, thickness:0.18, tessellation:20 }, scene);
+    fRim.position.set(fp[0], 0.5, fp[1]); fRim.rotation.x=Math.PI/2; fRim.material = marbleMat;
+    // Fountain jet
+    const jet = BABYLON.MeshBuilder.CreateCylinder('jet'+i, { diameterTop:0.05, diameterBottom:0.15, height:2, tessellation:8 }, scene);
+    jet.position.set(fp[0], 1.25, fp[1]); jet.material = waterM;
+  });
+
+  // ── GARDEN PATHS ──
+  const pathMat = stoneMat('path', 0.7,0.65,0.55);
+  // Main axis path
+  const mainPath = BABYLON.MeshBuilder.CreateBox('mainPath', { width:8, height:0.05, depth:70 }, scene);
+  mainPath.position.set(0, 0.03, 15);
+  mainPath.material = pathMat;
+  // Cross path
+  const crossPath = BABYLON.MeshBuilder.CreateBox('crossPath', { width:50, height:0.05, depth:4 }, scene);
+  crossPath.position.set(0, 0.03, 18);
+  crossPath.material = pathMat;
+
+  // ── TREES / CYPRESS ──
+  function buildCypress(x, z) {
+    const trunk = BABYLON.MeshBuilder.CreateCylinder('trk'+x+z, { diameter:0.4, height:2, tessellation:8 }, scene);
+    trunk.position.set(x, 1, z);
+    trunk.material = stoneMat('bark', 0.35,0.22,0.12);
+    trunk.checkCollisions = true;
+    const foliage = BABYLON.MeshBuilder.CreateCylinder('fol'+x+z, { diameterTop:0.2, diameterBottom:1.8, height:7, tessellation:8 }, scene);
+    foliage.position.set(x, 5.5, z);
+    foliage.material = stoneMat('leaf', 0.12,0.32,0.15);
+    foliage.checkCollisions = true;
+  }
+
+  // Cypress rows along paths
+  for (let i=0; i<6; i++) {
+    buildCypress(-5, 4 + i*6);
+    buildCypress(5, 4 + i*6);
+    buildCypress(-20, 4 + i*6);
+    buildCypress(20, 4 + i*6);
+  }
+
+  // Flower beds
+  const flowerMat = stoneMat('flower', 0.8,0.3,0.3);
+  const flowerPositions = [
+    [10,5],[10,12],[-10,5],[-10,12],
+    [10,24],[10,31],[-10,24],[-10,31],
+    [25,5],[25,12],[-25,5],[-25,12],
+  ];
+  flowerPositions.forEach((fp,i) => {
+    const fl = BABYLON.MeshBuilder.CreateBox('fl'+i, { width:2.5, height:0.3, depth:2.5 }, scene);
+    fl.position.set(fp[0], 0.15, fp[1]);
+    fl.material = i%3===0 ? flowerMat : (i%3===1 ? stoneMat('flower2',0.9,0.8,0.2) : stoneMat('flower3',0.5,0.2,0.7));
+  });
+
+  updateLoading(90);
+
+  // ── OUTER WALLS ──
+  const wallMat = redSandMat;
+  const wallH = 10;
+  // North wall
+  const wN = BABYLON.MeshBuilder.CreateBox('wN', { width:80, height:wallH, depth:2 }, scene);
+  wN.position.set(0, wallH/2, -37); wN.material=wallMat; wN.checkCollisions=true;
+  // South wall (with gate opening)
+  const wS1 = BABYLON.MeshBuilder.CreateBox('wS1', { width:29, height:wallH, depth:2 }, scene);
+  wS1.position.set(-25.5, wallH/2, 65); wS1.material=wallMat; wS1.checkCollisions=true;
+  const wS2 = wS1.clone('wS2');
+  wS2.position.x = 25.5;
+  // East wall
+  const wE = BABYLON.MeshBuilder.CreateBox('wE', { width:2, height:wallH, depth:105 }, scene);
+  wE.position.set(40, wallH/2, 14); wE.material=wallMat; wE.checkCollisions=true;
+  // West wall
+  const wW = wE.clone('wW');
+  wW.position.x = -40;
+
+  // Corner towers
+  const towerPos = [[-40,-37],[40,-37],[-40,65],[40,65]];
+  towerPos.forEach((tp,i) => {
+    const tower = BABYLON.MeshBuilder.CreateBox('tower'+i, { width:6, height:wallH*1.5, depth:6 }, scene);
+    tower.position.set(tp[0], wallH*0.75, tp[1]); tower.material=wallMat; tower.checkCollisions=true;
+    const tDome = BABYLON.MeshBuilder.CreateSphere('tdome'+i, { diameter:5, segments:12 }, scene);
+    tDome.position.set(tp[0], wallH*1.5+2, tp[1]); tDome.material=marbleMat;
+  });
+
+  // ── GROUND OUTSIDE ──
+  const outerGround = BABYLON.MeshBuilder.CreateGround('outerGround', { width:200, height:200 }, scene);
+  outerGround.position.y = -0.05;
+  outerGround.material = stoneMat('outerSand', 0.65,0.55,0.38);
+
+  updateLoading(95);
+
+  // ── SHADOW GENERATOR ──
+  const shadowGen = new BABYLON.ShadowGenerator(1024, sun);
+  shadowGen.useBlurExponentialShadowMap = true;
+  shadowGen.blurKernel = 16;
+  [mainDome, drum, mainBase, tier2, tier3].forEach(m => shadowGen.addShadowCaster(m));
+
+  // ── AMBIENT PARTICLES (dust motes) ──
+  const dustSystem = new BABYLON.ParticleSystem('dust', 200, scene);
+  dustSystem.particleTexture = new BABYLON.Texture('https://assets.babylonjs.com/textures/flare.png', scene);
+  dustSystem.emitter = new BABYLON.Vector3(0, 5, 0);
+  dustSystem.minEmitBox = new BABYLON.Vector3(-30, 0, -30);
+  dustSystem.maxEmitBox = new BABYLON.Vector3(30, 10, 30);
+  dustSystem.color1 = new BABYLON.Color4(1,0.9,0.7,0.15);
+  dustSystem.color2 = new BABYLON.Color4(1,1,1,0.05);
+  dustSystem.minSize = 0.05; dustSystem.maxSize = 0.2;
+  dustSystem.minLifeTime = 8; dustSystem.maxLifeTime = 15;
+  dustSystem.emitRate = 20;
+  dustSystem.direction1 = new BABYLON.Vector3(-0.1,0.05,-0.1);
+  dustSystem.direction2 = new BABYLON.Vector3(0.1,0.1,0.1);
+  dustSystem.minEmitPower = 0.1; dustSystem.maxEmitPower = 0.3;
+  dustSystem.updateSpeed = 0.01;
+  dustSystem.start();
+
+  // ── GOLDEN DOME GLOW ──
+  const glowLayer = new BABYLON.GlowLayer('glow', scene);
+  glowLayer.intensity = 0.4;
+  glowLayer.addIncludedOnlyMesh(finialBall);
+  glowLayer.addIncludedOnlyMesh(cenoTop);
+
+  updateLoading(100);
+
+  // Show click-to-start after loading
+  setTimeout(() => {
+    const ls = document.getElementById('loading-screen');
+    ls.classList.add('hidden');
+    setTimeout(() => {
+      ls.style.display = 'none';
+      document.getElementById('click-to-start').classList.remove('hidden');
+    }, 800);
+  }, 600);
+
+  // Pointer lock on click
+  document.getElementById('click-to-start').addEventListener('click', () => {
+  canvas.requestPointerLock();
+  canvas.focus();  // ⭐ HERE
+  document.getElementById('click-to-start').classList.add('hidden');
+});
+    
+  
+
+  document.addEventListener('pointerlockchange', () => {
+    const locked = document.pointerLockElement === canvas;
+    document.getElementById('crosshair').style.display = locked ? 'block' : 'none';
+    document.getElementById('hud-sub').textContent = locked
+      ? 'WASD to walk · ESC to release cursor'
+      : 'Click to lock cursor and explore';
+  });
+
+  // Location detection by camera Z position
+  scene.registerBeforeRender(() => {
+    const z = camera.position.z;
+    if (z > 45) showLocationOnce('gateway', '🚪 Darwaza-i-Rauza — The Great Gate');
+    else if (z > 10) showLocationOnce('garden', '🌿 Charbagh — The Four-Quadrant Garden');
+    else if (z > -2) showLocationOnce('pool', '💧 Hauz-i-Kausar — The Reflecting Pool');
+    else if (z > -15) showLocationOnce('platform', '🕌 You are at the Taj Mahal Platform');
+    else showLocationOnce('interior', '🏛 Inner Chamber of the Taj Mahal');
+  });
+
+  return scene;
+}
+
+// Location detection helper
+const shownLocations = new Set();
+let lastLocationTime = 0;
+function showLocationOnce(key, msg) {
+  const now = Date.now();
+  if (!shownLocations.has(key) && now - lastLocationTime > 4000) {
+    shownLocations.add(key);
+    lastLocationTime = now;
+    showLocation(msg, 4000);
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────────
+createScene().then(sc => {
+  engine.runRenderLoop(() => sc.render());
+});
+
+window.addEventListener('resize', () => engine.resize());
+
+// Loading progress animation
+let prog = 0;
+const progInterval = setInterval(() => {
+  prog = Math.min(prog + 2, 95);
+  document.getElementById('loading-bar').style.width = prog + '%';
+  if (prog >= 95) clearInterval(progInterval);
+}, 50);
+</script>
+</body>
+</html>
