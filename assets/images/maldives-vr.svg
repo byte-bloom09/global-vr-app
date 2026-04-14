@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0" stop-color="#073b4c"/>
+      <stop offset="1" stop-color="#2ec4b6"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#g)"/>
+  <g fill="#ffffff" opacity="0.95" text-anchor="middle">
+    <path d="M0 680 C 180 620, 360 700, 540 660 C 720 620, 900 700, 1080 660 C 1260 620, 1400 700, 1400 700 L1400 900 L0 900 Z" fill="#ffffff22"/>
+    <text x="50%" y="48%" font-size="56" font-family="Arial, Helvetica, sans-serif" font-weight="700">Maldives VR</text>
+  </g>
+</svg>

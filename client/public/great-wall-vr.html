@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Great Wall VR — Global VR</title>
+  <style>
+    html,body { height:100%; margin:0; background:#000; color:#fff; font-family:Segoe UI, system-ui, -apple-system, 'Helvetica Neue', Arial; }
+    .hud { position:fixed; top:0; left:0; right:0; z-index:10; display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:linear-gradient(to bottom, rgba(0,0,0,0.6), rgba(0,0,0,0)); }
+    .hud button { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:8px 12px; border-radius:8px; cursor:pointer; }
+    .title { font-weight:700; letter-spacing:.02em; }
+    iframe { position:fixed; inset:0; width:100%; height:100%; border:0; }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <button onclick="history.back()">← Back</button>
+    <div class="title">🏯 Great Wall VR</div>
+    <div style="width:56px"></div>
+  </div>
+  <iframe src="https://sketchfab.com/models/eb94be2c56a14f009e6f0f2533c996d7/embed?autostart=1&ui_theme=dark&ui_infos=0&ui_controls=1&ui_stop=0&preload=1" allow="autoplay; fullscreen; vr; xr" allowfullscreen></iframe>
+</body>
+</html>

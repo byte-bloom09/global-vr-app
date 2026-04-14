@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="s1" x1="0" x2="1">
+      <stop offset="0" stop-color="#1b0037"/>
+      <stop offset="1" stop-color="#5b2a86"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#s1)"/>
+  <g fill="#fff" text-anchor="middle">
+    <text x="50%" y="55%" font-size="48" font-family="Arial, Helvetica, sans-serif" font-weight="700">Space</text>
+  </g>
+</svg>

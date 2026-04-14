@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="g6" x1="0" x2="1">
+      <stop offset="0" stop-color="#3b2f2f"/>
+      <stop offset="1" stop-color="#c9b79c"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#g6)"/>
+  <g fill="#ffffff" text-anchor="middle">
+    <ellipse cx="700" cy="520" rx="420" ry="120" fill="#ffffff22"/>
+    <text x="50%" y="56%" font-size="52" font-family="Arial, Helvetica, sans-serif" font-weight="700">Roman Colosseum VR</text>
+  </g>
+</svg>

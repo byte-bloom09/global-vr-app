@@ -156,12 +156,15 @@
   <div style="text-align:center;">
     <div id="hud-title">🕌 Taj Mahal, Agra</div>
     <div id="hud-sub">WASD to walk · Mouse to look · Click to lock cursor</div>
+    <div id="hud-note" style="font-size:.65rem; color:rgba(255,255,255,0.45); margin-top:.4rem;">VR requires a WebXR-compatible browser and headset, and the page must be served over HTTPS.</div>
   </div>
   <div id="hud-right">
     <button class="hud-btn" onclick="teleportToGarden()">🌿 Garden</button>
     <button class="hud-btn" onclick="teleportToPool()">💧 Reflecting Pool</button>
     <button class="hud-btn" onclick="teleportToInterior()">🏛 Interior</button>
     <button class="hud-btn" onclick="toggleTimeOfDay()">🌗 Time</button>
+    <button class="hud-btn" onclick="enterVR()">🕶 VR</button>
+    <button class="hud-btn" onclick="showOpenOnDeviceModal()">📱 Open on Device</button>
   </div>
 </div>
 
@@ -183,20 +186,171 @@
 
 <script>
 const canvas = document.getElementById('renderCanvas');
+canvas.tabIndex = 0;
+canvas.focus();
 const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer:true, stencil:true });
 
-let scene, camera, isDay = true, timeOfDay = 0;
+let scene, camera, xrHelper, isDay = true, timeOfDay = 0;
 let loadProgress = 0;
 
 function updateLoading(pct, msg) {
   document.getElementById('loading-bar').style.width = pct + '%';
 }
 
-function showLocation(msg, duration=3000) {
+async function enterVR() {
+  // Prefer native WebXR when available
+  try {
+    if (navigator.xr && navigator.xr.isSessionSupported) {
+      const supported = await navigator.xr.isSessionSupported('immersive-vr').catch(() => false);
+      if (supported) {
+        if (!xrHelper) await setupXR();
+        if (xrHelper && xrHelper.baseExperience) {
+          xrHelper.baseExperience.enterXRAsync('immersive-vr', 'local-floor').catch((err) => {
+            console.warn('enterXRAsync failed:', err);
+            showLocation('⚠️ VR unavailable on this device or browser. Use a WebXR-compatible browser and headset.');
+          });
+        }
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn('WebXR check error', e);
+  }
+
+  // WebXR / immersive VR not supported on this device — offer a simulated demo
+  showVRFallbackPrompt('⚠️ Immersive VR is not available on this device. Would you like to run a simulated VR demo (fullscreen + pointer lock) for presentation?');
+}
+
+// Fallback UI: prompt to run a simulated VR demo when no headset is present
+function showVRFallbackPrompt(msg) {
+  let el = document.getElementById('vr-fallback');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'vr-fallback';
+    el.style.cssText = 'position:fixed;left:50%;top:18%;transform:translateX(-50%);z-index:1100;background:rgba(10,10,10,0.92);color:#ffd700;padding:14px;border-radius:10px;border:1px solid rgba(255,215,0,0.18);display:flex;align-items:center;gap:12px;max-width:760px;box-shadow:0 6px 30px rgba(0,0,0,0.6)';
+    el.innerHTML = `
+      <div style="flex:1;padding-right:8px">${msg}</div>
+      <div style="display:flex;gap:.5rem">
+        <button id="vr-sim-btn" class="hud-btn" style="pointer-events:all">Simulate VR</button>
+        <button id="vr-open-device-btn" class="hud-btn" style="pointer-events:all">Open on Device</button>
+        <button id="vr-cancel-btn" class="hud-btn" style="pointer-events:all">Cancel</button>
+      </div>`;
+    document.body.appendChild(el);
+    document.getElementById('vr-sim-btn').addEventListener('click', () => { el.remove(); simulateVR(); });
+    document.getElementById('vr-open-device-btn').addEventListener('click', () => { el.remove(); showOpenOnDeviceModal(); });
+    document.getElementById('vr-cancel-btn').addEventListener('click', () => el.remove());
+  } else {
+    el.firstElementChild.textContent = msg;
+    el.style.display = 'flex';
+  }
+}
+
+// Simulated VR demo: fullscreen + pointer lock + minimal UI for presentation
+async function simulateVR() {
+  try {
+    if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
+  } catch (e) { /* ignore */ }
+
+  // Hide HUD and controls to mimic immersive layout
+  const hud = document.getElementById('hud');
+  const controls = document.getElementById('controls-panel');
+  if (hud) hud.style.display = 'none';
+  if (controls) controls.style.display = 'none';
+
+  // Update HUD subtitle to indicate simulated mode
+  const hudSub = document.getElementById('hud-sub');
+  if (hudSub) hudSub.textContent = 'Simulated VR — use WASD + mouse (no headset)';
+
+  // Request pointer lock on the canvas to enable mouse look
+  if (canvas.requestPointerLock) canvas.requestPointerLock();
+
+  // Keep track so we can restore on exit
+  window._simulatedVR = true;
+
+  function restore() {
+    if (!window._simulatedVR) return;
+    window._simulatedVR = false;
+    if (hud) hud.style.display = '';
+    if (controls) controls.style.display = '';
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    showLocation('Exited simulated VR');
+    document.removeEventListener('fullscreenchange', onFull);
+    document.removeEventListener('pointerlockchange', onLock);
+  }
+
+  function onFull() {
+    if (!document.fullscreenElement) restore();
+  }
+  function onLock() {
+    if (document.pointerLockElement !== canvas) restore();
+  }
+
+  document.addEventListener('fullscreenchange', onFull);
+  document.addEventListener('pointerlockchange', onLock);
+}
+
+// Open-on-Device modal: shows QR code + link so evaluators can open page in a WebXR-capable browser
+function showOpenOnDeviceModal() {
+  const url = location.href;
+  const qrUrl = 'https://api.qrserver.com/v1/create-qr-code?data=' + encodeURIComponent(url) + '&size=240x240';
+  let m = document.getElementById('open-on-device-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'open-on-device-modal';
+    m.style.cssText = 'position:fixed;left:50%;top:12%;transform:translateX(-50%);z-index:1110;background:rgba(6,6,6,0.96);color:#fff;padding:18px;border-radius:12px;border:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:14px;max-width:820px;box-shadow:0 10px 40px rgba(0,0,0,0.7)';
+    m.innerHTML = `
+      <div style="display:flex;gap:12px;align-items:center">
+        <img id="open-qr" src="${qrUrl}" alt="QR" style="width:220px;height:220px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:#fff" />
+        <div style="display:flex;flex-direction:column;gap:8px;max-width:520px">
+          <div style="color:#ffd700;font-weight:700">Open on WebXR-capable device</div>
+          <div style="color:#ddd;font-size:.95rem">Scan the QR code with your headset/phone or copy the link below and open it in a WebXR-capable browser (Oculus Browser, Chrome with WebXR support, Edge on headset).</div>
+          <input id="open-link-input" value="${url}" readonly style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03);color:#fff" />
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button id="open-copy-btn" class="hud-btn" style="pointer-events:all">Copy link</button>
+            <button id="open-open-btn" class="hud-btn" style="pointer-events:all">Open in new tab</button>
+            <button id="open-close-btn" class="hud-btn" style="pointer-events:all">Close</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(m);
+    document.getElementById('open-copy-btn').addEventListener('click', async () => { await navigator.clipboard.writeText(url).catch(()=>{}); showLocation('Link copied to clipboard'); });
+    document.getElementById('open-open-btn').addEventListener('click', () => { window.open(url, '_blank'); });
+    document.getElementById('open-close-btn').addEventListener('click', () => m.remove());
+  } else {
+    document.getElementById('open-qr').src = qrUrl;
+    document.getElementById('open-link-input').value = url;
+    m.style.display = 'flex';
+  }
+}
+
+async function setupXR() {
+  if (!scene) return;
+  try {
+    xrHelper = await scene.createDefaultXRExperienceAsync({
+      floorMeshes: []
+    });
+    xrHelper.baseExperience.camera.position = camera.position;
+    xrHelper.baseExperience.onStateChangedObservable.add((state) => {
+      if (state === BABYLON.WebXRState.IN_XR) {
+        document.getElementById('hud-sub').textContent = 'VR connected — use controllers to move and look around';
+        showLocation('✅ VR connection established — enjoy the Taj Mahal in immersive VR');
+      } else if (state === BABYLON.WebXRState.NOT_IN_XR) {
+        document.getElementById('hud-sub').textContent = 'WASD to walk · Mouse to look · Click to lock cursor';
+      }
+    });
+  } catch (err) {
+    console.warn('WebXR setup failed:', err);
+    showLocation('⚠️ WebXR setup failed. Your browser may not support VR, or a headset is not connected.');
+  }
+}
+
+function showLocation(msg) {
   const el = document.getElementById('location-popup');
   el.textContent = msg;
   el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), duration);
+  // Remove any existing click listener to avoid duplicates
+  el.onclick = null;
+  el.onclick = () => el.classList.remove('show');
 }
 
 // ── TELEPORT FUNCTIONS ──────────────────────────────────
@@ -218,7 +372,7 @@ function teleportToMain() {
 function teleportToInterior() {
   camera.position = new BABYLON.Vector3(0, 3, -2);
   camera.rotation = new BABYLON.Vector3(0.1, Math.PI, 0);
-  showLocation('🏛 Inner Chamber — The Cenotaph of Mumtaz Mahal');
+  showLocation('🏛 Inner Chamber — The Cenotaph of Mumtaz Mahal, adorned with intricate marble inlays, pietra dura work featuring semi-precious stones, and Quranic calligraphy on the walls. Surrounded by marble screens (jali) and arched doorways leading to side chambers.');
 }
 
 function toggleTimeOfDay() {
@@ -245,39 +399,51 @@ function updateSkyAndLight() {
 }
 
 // ── MATERIAL HELPERS ────────────────────────────────────
-function marbMat(name, r=1,g=1,b=1, spec=0.8) {
-  const m = new BABYLON.StandardMaterial(name, scene);
-  m.diffuseColor = new BABYLON.Color3(r,g,b);
-  m.specularColor = new BABYLON.Color3(spec,spec,spec);
-  m.specularPower = 64;
+function marbMat(name, r=1,g=1,b=1, roughness=0.25) {
+  const m = new BABYLON.PBRMaterial(name, scene);
+  m.albedoColor = new BABYLON.Color3(r,g,b);
+  m.metallic = 0;
+  m.roughness = roughness;
+  m.environmentIntensity = 0.9;
+  m.reflectivityColor = new BABYLON.Color3(0.85,0.85,0.85);
   return m;
 }
 function stoneMat(name, r,g,b) {
-  const m = new BABYLON.StandardMaterial(name, scene);
-  m.diffuseColor = new BABYLON.Color3(r,g,b);
-  m.specularColor = new BABYLON.Color3(0.1,0.1,0.1);
+  const m = new BABYLON.PBRMaterial(name, scene);
+  m.albedoColor = new BABYLON.Color3(r,g,b);
+  m.metallic = 0;
+  m.roughness = 0.7;
+  m.environmentIntensity = 0.8;
+  m.reflectivityColor = new BABYLON.Color3(0.2,0.2,0.2);
   return m;
 }
 function waterMat(name) {
-  const m = new BABYLON.StandardMaterial(name, scene);
-  m.diffuseColor = new BABYLON.Color3(0.1,0.4,0.6);
-  m.specularColor = new BABYLON.Color3(0.8,0.9,1.0);
-  m.specularPower = 128;
-  m.alpha = 0.75;
+  const m = new BABYLON.PBRMaterial(name, scene);
+  m.albedoColor = new BABYLON.Color3(0.1,0.4,0.6);
+  m.metallic = 0;
+  m.roughness = 0.08;
+  m.environmentIntensity = 1.0;
+  m.reflectivityColor = new BABYLON.Color3(0.8,0.9,1.0);
+  m.alpha = 0.7;
+  m.transparencyMode = BABYLON.PBRMaterial.PBRMATERIAL_ALPHABLEND;
   return m;
 }
 function goldMat(name) {
-  const m = new BABYLON.StandardMaterial(name, scene);
-  m.diffuseColor = new BABYLON.Color3(0.8,0.6,0.1);
-  m.specularColor = new BABYLON.Color3(1,0.9,0.3);
-  m.specularPower = 96;
-  m.emissiveColor = new BABYLON.Color3(0.1,0.07,0.0);
+  const m = new BABYLON.PBRMaterial(name, scene);
+  m.albedoColor = new BABYLON.Color3(0.95,0.75,0.15);
+  m.metallic = 1;
+  m.roughness = 0.18;
+  m.environmentIntensity = 1.1;
+  m.reflectivityColor = new BABYLON.Color3(1,0.9,0.35);
   return m;
 }
 function grassMat(name) {
-  const m = new BABYLON.StandardMaterial(name, scene);
-  m.diffuseColor = new BABYLON.Color3(0.2,0.45,0.15);
-  m.specularColor = new BABYLON.Color3(0,0,0);
+  const m = new BABYLON.PBRMaterial(name, scene);
+  m.albedoColor = new BABYLON.Color3(0.2,0.45,0.15);
+  m.metallic = 0;
+  m.roughness = 0.75;
+  m.environmentIntensity = 0.7;
+  m.reflectivityColor = new BABYLON.Color3(0.1,0.15,0.1);
   return m;
 }
 
@@ -328,7 +494,9 @@ function buildArch(name, x, y, z, w, h, d, mat, rotY=0) {
 async function createScene() {
   scene = new BABYLON.Scene(engine);
   scene.clearColor = new BABYLON.Color4(0.53,0.81,0.98,1);
-  scene.gravity = new BABYLON.Vector3(0, -0.9, 0);
+  scene.environmentTexture = BABYLON.CubeTexture.CreateFromPrefilteredData('https://playground.babylonjs.com/textures/environment.env', scene);
+  scene.environmentIntensity = 0.8;
+  scene.gravity = new BABYLON.Vector3(0, 0, 0);
   scene.collisionsEnabled = true;
   scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
   scene.fogDensity = 0.008;
@@ -342,9 +510,9 @@ async function createScene() {
   camera.fov = 1.1;
   camera.minZ = 0.1;
   camera.maxZ = 500;
-  camera.speed = 0.35;
+  camera.speed = 1.0;
   camera.angularSensibility = 800;
-  camera.applyGravity = true;
+  camera.applyGravity = false;
   camera.checkCollisions = true;
   camera.ellipsoid = new BABYLON.Vector3(0.5, 1.1, 0.5);
   camera.keysUp = [87, 38];    // W, Up
@@ -352,6 +520,15 @@ async function createScene() {
   camera.keysLeft = [65, 37];  // A, Left
   camera.keysRight = [68, 39]; // D, Right
   camera.attachControl(canvas, true);
+
+  const pipeline = new BABYLON.DefaultRenderingPipeline('defaultPipeline', true, scene, [camera]);
+  pipeline.bloomEnabled = false;
+  pipeline.imageProcessingEnabled = true;
+  scene.imageProcessingConfiguration.contrast = 1.0;
+  scene.imageProcessingConfiguration.exposure = 0.95;
+  scene.imageProcessingConfiguration.toneMappingEnabled = true;
+  scene.imageProcessingConfiguration.toneMappingType = BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+  scene.imageProcessingConfiguration.vignetteEnabled = false;
 
   // ── LIGHTS ──
   const sun = new BABYLON.DirectionalLight('sunLight', new BABYLON.Vector3(-0.5,-1,-0.3), scene);
@@ -522,6 +699,47 @@ async function createScene() {
   const cenoTop = BABYLON.MeshBuilder.CreateSphere('cenoTop', { diameter:1.5 }, scene);
   cenoTop.position.set(0, 7, -5); cenoTop.scaling.y=1.2;
   cenoTop.material = goldM;
+
+  // ── INTERIOR DETAILS ──
+  // Marble screens (jali) around cenotaph
+  const jaliMat = marbMat('jali', 0.9,0.85,0.8, 0.3);
+  const jaliPositions = [
+    { x:3, z:-5, rot:0 }, { x:-3, z:-5, rot:0 },
+    { x:0, z:-2, rot:Math.PI/2 }, { x:0, z:-8, rot:Math.PI/2 }
+  ];
+  jaliPositions.forEach((p,i) => {
+    const jali = BABYLON.MeshBuilder.CreateBox('jali'+i, { width:0.1, height:3, depth:2 }, scene);
+    jali.position.set(p.x, 4.5, p.z);
+    jali.rotation.y = p.rot;
+    jali.material = jaliMat;
+  });
+
+  // Arched doorways to side chambers
+  buildArch('intArch1', 6, 2.5, -5, 3, 6, 0.5, interiorMat);
+  buildArch('intArch2', -6, 2.5, -5, 3, 6, 0.5, interiorMat);
+
+  // Calligraphic panels on walls (simulated with colored boxes)
+  const calliMat = marbMat('calli', 0.85,0.8,0.75, 0.4);
+  const calliPositions = [
+    { x:0, y:6, z:4.4 }, { x:0, y:6, z:-14.6 },
+    { x:8.4, y:6, z:-5 }, { x:-8.4, y:6, z:-5 }
+  ];
+  calliPositions.forEach((p,i) => {
+    const panel = BABYLON.MeshBuilder.CreateBox('calli'+i, { width:4, height:2, depth:0.1 }, scene);
+    panel.position.set(p.x, p.y, p.z);
+    panel.material = calliMat;
+  });
+
+  // Decorative vases
+  const vaseMat = marbMat('vase', 0.7,0.65,0.6, 0.5);
+  const vasePositions = [
+    { x:7, z:-3 }, { x:-7, z:-3 }, { x:7, z:-7 }, { x:-7, z:-7 }
+  ];
+  vasePositions.forEach((p,i) => {
+    const vase = BABYLON.MeshBuilder.CreateCylinder('vase'+i, { diameterTop:0.3, diameterBottom:0.5, height:1.5, tessellation:12 }, scene);
+    vase.position.set(p.x, 3.25, p.z);
+    vase.material = vaseMat;
+  });
 
   updateLoading(70);
 
@@ -708,14 +926,24 @@ async function createScene() {
     }, 800);
   }, 600);
 
-  // Pointer lock on click
-  document.getElementById('click-to-start').addEventListener('click', () => {
-  canvas.requestPointerLock();
-  canvas.focus();  // ⭐ HERE
-  document.getElementById('click-to-start').classList.add('hidden');
-});
-    
-  
+  const startOverlay = document.getElementById('click-to-start');
+  const requestLock = () => {
+    if (document.pointerLockElement !== canvas && canvas.requestPointerLock) {
+      canvas.requestPointerLock();
+      canvas.focus();
+    }
+  };
+
+  // Pointer lock on overlay click or canvas click
+  startOverlay.addEventListener('click', requestLock);
+  canvas.addEventListener('click', requestLock);
+
+  // ESC to release pointer lock
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Escape') {
+      document.exitPointerLock();
+    }
+  });
 
   document.addEventListener('pointerlockchange', () => {
     const locked = document.pointerLockElement === canvas;
@@ -723,6 +951,11 @@ async function createScene() {
     document.getElementById('hud-sub').textContent = locked
       ? 'WASD to walk · ESC to release cursor'
       : 'Click to lock cursor and explore';
+    if (locked) {
+      startOverlay.classList.add('hidden');
+    } else {
+      startOverlay.classList.remove('hidden');
+    }
   });
 
   // Location detection by camera Z position
@@ -746,13 +979,14 @@ function showLocationOnce(key, msg) {
   if (!shownLocations.has(key) && now - lastLocationTime > 4000) {
     shownLocations.add(key);
     lastLocationTime = now;
-    showLocation(msg, 4000);
+    showLocation(msg);
   }
 }
 
 // ── INIT ──────────────────────────────────────────────────
-createScene().then(sc => {
+createScene().then(async (sc) => {
   engine.runRenderLoop(() => sc.render());
+  await setupXR();
 });
 
 window.addEventListener('resize', () => engine.resize());
