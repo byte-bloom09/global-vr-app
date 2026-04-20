@@ -1,0 +1,1659 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Global VR — Explore the World</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <style>
+    :root {
+      --bg:#04060f; --surface:#090d1a; --card:#0f1525; --card2:#141b2d; --border:#1a2540;
+      --accent:#00ffe0; --accent2:#7c5cf6; --accent3:#ff6b35;
+      --text:#e2e8f8; --muted:#5a6a8a;
+      --danger:#ff4757; --success:#2ed573; --warning:#ffa502;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+    .page{display:none;min-height:100vh;}
+    .page.active{display:block;}
+
+    /* NAVBAR */
+    #navbar{position:fixed;top:0;left:0;right:0;z-index:300;display:flex;align-items:center;justify-content:space-between;padding:0 2.5rem;height:64px;background:rgba(4,6,15,0.92);backdrop-filter:blur(18px);border-bottom:1px solid var(--border);}
+    .nav-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.35rem;color:var(--accent);cursor:pointer;letter-spacing:-.02em;display:flex;align-items:center;gap:.4rem;}
+    .nav-logo span{color:var(--text);}
+    .nav-right{display:flex;align-items:center;gap:1rem;}
+    .nav-btn{background:none;border:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:500;cursor:pointer;padding:.4rem .75rem;border-radius:6px;transition:color .2s,background .2s;}
+    .nav-btn:hover,.nav-btn.active-link{color:var(--accent);background:rgba(0,255,224,.06);}
+    .nav-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;color:#fff;font-family:'Syne',sans-serif;}
+    .nav-name{font-size:.85rem;color:var(--muted);}
+
+    /* BUTTONS */
+    .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.65rem 1.4rem;border-radius:8px;border:none;font-family:'DM Sans',sans-serif;font-weight:500;font-size:.9rem;cursor:pointer;transition:all .2s;}
+    .btn-primary{background:var(--accent);color:#04060f;box-shadow:0 0 20px rgba(0,255,224,.25);}
+    .btn-primary:hover{box-shadow:0 0 32px rgba(0,255,224,.45);transform:translateY(-1px);}
+    .btn-outline{background:transparent;color:var(--accent);border:1px solid var(--accent);}
+    .btn-outline:hover{background:rgba(0,255,224,.08);}
+    .btn-ghost{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--border);}
+    .btn-ghost:hover{background:rgba(255,255,255,.1);}
+    .btn-danger{background:var(--danger);color:#fff;}
+    .btn-danger:hover{opacity:.85;}
+    .btn-purple{background:var(--accent2);color:#fff;}
+    .btn-purple:hover{opacity:.9;}
+    .btn-sm{padding:.38rem .9rem;font-size:.8rem;}
+    .btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important;}
+
+    /* FORMS */
+    .form-group{display:flex;flex-direction:column;gap:.4rem;margin-bottom:1.1rem;}
+    label{font-size:.75rem;font-weight:500;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;}
+    input,textarea,select{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.95rem;padding:.72rem 1rem;transition:border-color .2s,box-shadow .2s;width:100%;outline:none;}
+    input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,255,224,.1);}
+    input::placeholder,textarea::placeholder{color:var(--muted);}
+    select option{background:var(--card);}
+    textarea{resize:vertical;min-height:80px;}
+
+    /* Password toggle */
+    .pwd-wrap{position:relative;}
+    .pwd-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:.2rem;font-size:1rem;border-radius:6px}
+    .pwd-toggle:hover{color:var(--accent)}
+
+    /* TOAST */
+    #toast-wrap{position:fixed;bottom:2rem;right:2rem;z-index:9999;display:flex;flex-direction:column;gap:.6rem;}
+    .toast{padding:.8rem 1.3rem;border-radius:10px;font-size:.875rem;font-weight:500;display:flex;align-items:center;gap:.6rem;max-width:310px;animation:toastIn .3s ease,toastOut .3s ease 2.7s forwards;backdrop-filter:blur(10px);}
+    .toast.success{background:rgba(46,213,115,.15);border:1px solid rgba(46,213,115,.35);color:var(--success);}
+    .toast.error{background:rgba(255,71,87,.15);border:1px solid rgba(255,71,87,.35);color:var(--danger);}
+    .toast.info{background:rgba(0,255,224,.1);border:1px solid rgba(0,255,224,.3);color:var(--accent);}
+    @keyframes toastIn{from{transform:translateX(110%);opacity:0}to{transform:none;opacity:1}}
+    @keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateX(110%)}}
+
+    /* MODAL */
+    .modal-bg{position:fixed;inset:0;z-index:400;background:rgba(4,6,15,.88);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:1rem;}
+    .modal-bg.open{display:flex;}
+    .modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem;width:90%;max-width:460px;position:relative;animation:modalIn .25s ease;max-height:90vh;overflow-y:auto;}
+    @keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(10px)}to{opacity:1;transform:none}}
+    .modal-x{position:absolute;top:1rem;right:1rem;background:none;border:none;color:var(--muted);font-size:1.5rem;cursor:pointer;line-height:1;}
+    .modal-x:hover{color:var(--text);}
+    .modal h2{font-family:'Syne',sans-serif;font-size:1.2rem;margin-bottom:1.4rem;}
+
+    /* SPINNER */
+    .spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(0,255,224,.3);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite;}
+    @keyframes sp{to{transform:rotate(360deg)}}
+
+    /* BADGES */
+    .badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:600;letter-spacing:.04em;}
+    .badge-teal{background:rgba(0,255,224,.1);color:var(--accent);}
+    .badge-purple{background:rgba(124,92,246,.15);color:var(--accent2);}
+    .badge-orange{background:rgba(255,107,53,.15);color:var(--accent3);}
+    .badge-yellow{background:rgba(255,165,2,.15);color:var(--warning);}
+    .badge-red{background:rgba(255,71,87,.15);color:var(--danger);}
+    .badge-green{background:rgba(46,213,115,.15);color:var(--success);}
+
+    /* DESTINATION CARDS */
+    .dest-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.5rem;}
+    .dest-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:transform .25s,border-color .25s,box-shadow .25s;display:flex;flex-direction:column;}
+    .dest-card:hover{transform:translateY(-5px);border-color:rgba(0,255,224,.2);box-shadow:0 0 30px rgba(0,255,224,.1);}
+    .dest-thumb{width:100%;height:220px;object-fit:cover;object-position:center;background:var(--surface);display:block;}
+    .dest-thumb-ph{width:100%;height:220px;background:linear-gradient(135deg,var(--surface),var(--card2));display:flex;align-items:center;justify-content:center;font-size:3.5rem;}
+    .dest-body{padding:1.2rem;flex:1;display:flex;flex-direction:column;gap:.5rem;}
+    .dest-name{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;}
+    .dest-desc{font-size:.84rem;color:var(--muted);line-height:1.6;}
+    .dest-meta{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;}
+    .dest-price{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem;color:var(--accent);}
+    .dest-actions{display:flex;gap:.5rem;padding:0 1.2rem 1.2rem;flex-wrap:wrap;}
+
+    /* TABLE */
+    .table-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border);}
+    table{width:100%;border-collapse:collapse;}
+    th{background:var(--surface);padding:.85rem 1.1rem;text-align:left;font-size:.75rem;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border);}
+    td{padding:.85rem 1.1rem;font-size:.875rem;border-bottom:1px solid rgba(26,37,64,.5);vertical-align:middle;}
+    tr:last-child td{border-bottom:none;}
+    tr:hover td{background:rgba(255,255,255,.02);}
+
+    /* SECTION HEADER */
+    .section-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.75rem;flex-wrap:wrap;gap:1rem;}
+    .section-hd h2{font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;}
+    .section-hd p{font-size:.875rem;color:var(--muted);margin-top:.25rem;}
+
+    /* EMPTY STATE */
+    .empty{text-align:center;padding:4rem 2rem;color:var(--muted);}
+    .empty .empty-icon{font-size:3.5rem;margin-bottom:1rem;opacity:.5;}
+    .empty p{font-size:.95rem;}
+
+    /* STARS */
+    .stars{display:flex;gap:3px;}
+    .star{font-size:1.1rem;cursor:pointer;transition:transform .1s;color:var(--muted);}
+    .star.lit{color:#ffd700;}
+    .star:hover{transform:scale(1.2);}
+
+    /* ===================== PAGE: LANDING ===================== */
+    #page-landing{background:var(--bg);}
+    .hero{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:8rem 2rem 5rem;position:relative;overflow:hidden;}
+    .hero-glow{position:absolute;inset:0;background:radial-gradient(ellipse 80% 55% at 50% 0%,rgba(0,255,224,.07) 0%,transparent 70%),radial-gradient(ellipse 60% 45% at 80% 80%,rgba(124,92,246,.06) 0%,transparent 60%);pointer-events:none;}
+    .hero-pill{display:inline-flex;align-items:center;gap:.5rem;background:rgba(0,255,224,.07);border:1px solid rgba(0,255,224,.2);border-radius:20px;padding:.4rem 1rem;font-size:.78rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:2rem;}
+    .hero h1{font-family:'Syne',sans-serif;font-size:clamp(2.8rem,7vw,6rem);font-weight:800;line-height:1.03;letter-spacing:-.03em;margin-bottom:1.5rem;}
+    .hero h1 .hl{color:var(--accent);}
+    .hero h1 .dim{opacity:.25;}
+    .hero p{max-width:500px;font-size:1.05rem;line-height:1.75;color:var(--muted);margin-bottom:2.5rem;}
+    .hero-btns{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;}
+    .features{padding:4rem 2.5rem 6rem;max-width:1100px;margin:0 auto;}
+    .features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.25rem;}
+    .feat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.6rem;position:relative;overflow:hidden;transition:border-color .3s;}
+    .feat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(to right,var(--accent),var(--accent2));opacity:0;transition:opacity .3s;}
+    .feat:hover{border-color:rgba(0,255,224,.2);}
+    .feat:hover::before{opacity:1;}
+    .feat-icon{font-size:1.75rem;margin-bottom:.9rem;}
+    .feat h3{font-family:'Syne',sans-serif;font-size:.95rem;font-weight:700;margin-bottom:.4rem;}
+    .feat p{font-size:.82rem;color:var(--muted);line-height:1.6;}
+
+    /* ===================== PAGE: AUTH ===================== */
+    #page-auth{display:none;min-height:100vh;align-items:stretch;}
+    #page-auth.active{display:grid;grid-template-columns:1fr 1fr;}
+    .auth-visual{background:linear-gradient(140deg,#04060f 0%,#0b1830 55%,#0c0f1e 100%);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:3rem;}
+    .auth-vis-glow{position:absolute;inset:0;background:radial-gradient(circle at 30% 40%,rgba(0,255,224,.09) 0%,transparent 55%),radial-gradient(circle at 70% 70%,rgba(124,92,246,.07) 0%,transparent 50%);pointer-events:none;}
+    .auth-vis-content{position:relative;}
+    .auth-vis-content h2{font-family:'Syne',sans-serif;font-size:2.6rem;font-weight:800;line-height:1.12;margin-bottom:1rem;}
+    .auth-vis-content h2 em{font-style:normal;color:var(--accent);}
+    .auth-vis-content p{color:var(--muted);font-size:.95rem;line-height:1.75;max-width:340px;}
+    .auth-dots{display:grid;grid-template-columns:repeat(10,1fr);gap:8px;margin-top:3rem;opacity:.12;}
+    .auth-dots span{width:4px;height:4px;border-radius:50%;background:var(--accent);display:block;}
+    .auth-form-side{display:flex;align-items:center;justify-content:center;padding:3rem 2rem;background:var(--surface);}
+    .auth-box{width:100%;max-width:400px;}
+    .auth-box h2{font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;margin-bottom:.4rem;}
+    .auth-box .auth-sub{font-size:.875rem;color:var(--muted);margin-bottom:2rem;}
+    .auth-toggle{display:flex;gap:.4rem;margin-top:1.4rem;justify-content:center;font-size:.875rem;color:var(--muted);}
+    .auth-toggle button{background:none;border:none;color:var(--accent);font-size:.875rem;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;}
+    .auth-toggle button:hover{text-decoration:underline;}
+    .auth-err{background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:.7rem 1rem;font-size:.85rem;color:var(--danger);margin-bottom:1rem;display:none;}
+    .auth-err.show{display:block;}
+    .forgot-link{background:none;border:none;color:var(--muted);font-size:.8rem;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:.25rem;text-align:right;display:block;width:100%;}
+    .forgot-link:hover{color:var(--accent);}
+    .pwd-hint{font-size:.75rem;color:var(--muted);margin-top:.35rem;line-height:1.5;}
+
+    /* ===================== PAGE: HUB ===================== */
+    #page-hub{padding-top:64px;}
+    .hub-header{padding:3rem 2.5rem 2rem;background:linear-gradient(to bottom,var(--surface),var(--bg));border-bottom:1px solid var(--border);}
+    .hub-header h1{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;margin-bottom:.4rem;}
+    .hub-header p{color:var(--muted);font-size:.95rem;}
+    .hub-controls{display:flex;align-items:center;gap:1rem;margin-top:1.5rem;flex-wrap:wrap;}
+    .hub-search{position:relative;flex:1;max-width:340px;}
+    .hub-search input{padding-left:2.5rem;}
+    .hub-search .search-icon{position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.9rem;pointer-events:none;}
+    .cat-filter{display:flex;gap:.5rem;flex-wrap:wrap;}
+    .cat-btn{background:var(--card);border:1px solid var(--border);color:var(--muted);padding:.4rem .9rem;border-radius:20px;font-size:.8rem;font-weight:500;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;}
+    .cat-btn:hover,.cat-btn.active{background:var(--accent);color:#04060f;border-color:var(--accent);}
+    .hub-body{padding:2rem 2.5rem;}
+
+    /* ===================== PAGE: PROFILE / FAVORITES / BOOKINGS ===================== */
+    #page-profile,#page-favorites,#page-bookings{padding-top:64px;}
+    .inner-page{max-width:980px;margin:0 auto;padding:2.5rem;}
+    .inner-page > .section-hd{margin-bottom:2rem;}
+
+    /* ===================== PAGE: ADMIN ===================== */
+    #page-admin{padding-top:64px;}
+    .admin-wrap{display:grid;grid-template-columns:220px 1fr;min-height:calc(100vh - 64px);}
+    .admin-sidebar{background:var(--surface);border-right:1px solid var(--border);padding:1.5rem 0;}
+    .admin-sidebar h3{font-family:'Syne',sans-serif;font-size:.7rem;font-weight:700;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;padding:0 1.25rem;margin-bottom:.75rem;}
+    .admin-nav-btn{display:flex;align-items:center;gap:.65rem;width:100%;background:none;border:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:500;padding:.65rem 1.25rem;cursor:pointer;transition:all .2s;text-align:left;}
+    .admin-nav-btn:hover,.admin-nav-btn.active{color:var(--accent);background:rgba(0,255,224,.06);}
+    .admin-nav-btn.active{border-right:2px solid var(--accent);}
+    .admin-content{padding:2rem 2.5rem;overflow-y:auto;}
+    .admin-panel{display:none;}
+    .admin-panel.active{display:block;}
+    .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:2rem;}
+    .stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.4rem;}
+    .stat-card .stat-val{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;color:var(--accent);}
+    .stat-card .stat-label{font-size:.8rem;color:var(--muted);margin-top:.2rem;}
+
+    /* ===================== VR VIEWER ===================== */
+    #page-vr{padding:0;position:fixed;top:0;left:0;width:100vw;height:100vh;overflow:hidden;}
+    #page-vr a-scene, #page-vr canvas{position:absolute!important;top:0!important;left:0!important;width:100%!important;height:100%!important;z-index:1!important;}
+    .vr-scene{display:none;}
+    .vr-scene.active{display:block;}
+    .vr-scene{display:none;}
+    .vr-scene.active{display:block;}
+    #vr-scene-wrap{width:100vw;height:100vh;position:relative;}
+    #vr-ui{position:absolute;top:0;left:0;right:0;z-index:50;pointer-events:none;}
+    #vr-topbar{pointer-events:all;display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;background:linear-gradient(to bottom,rgba(4,6,15,.9),transparent);}
+    #vr-dest-name{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;color:var(--accent);}
+    #vr-controls{position:absolute;bottom:2rem;left:50%;transform:translateX(-50%);display:flex;gap:.75rem;pointer-events:all;background:rgba(4,6,15,.75);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:50px;padding:.6rem 1.25rem;}
+    #vr-controls button{background:none;border:none;color:var(--muted);font-size:.85rem;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;padding:.35rem .75rem;border-radius:20px;transition:all .2s;display:flex;align-items:center;gap:.4rem;}
+    #vr-controls button:hover{color:var(--accent);background:rgba(0,255,224,.1);}
+    #vr-day-night{position:absolute;right:1.5rem;bottom:2rem;pointer-events:all;}
+    .dn-toggle{background:rgba(4,6,15,.75);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:50px;padding:.5rem .9rem;display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.8rem;color:var(--text);font-family:'DM Sans',sans-serif;}
+    .dn-toggle:hover{border-color:var(--accent);color:var(--accent);}
+
+    /* RESPONSIVE */
+    @media(max-width:768px){
+      #page-auth.active{grid-template-columns:1fr;}
+      .auth-visual{display:none;}
+      .admin-wrap{grid-template-columns:1fr;}
+      .admin-sidebar{display:none;}
+      .hub-body,.inner-page,.admin-content{padding:1.5rem;}
+      nav#navbar{padding:0 1rem;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── TOAST ── -->
+<div id="toast-wrap"></div>
+
+<!-- ── NAVBAR ── -->
+<nav id="navbar" style="display:none;">
+  <div class="nav-logo" onclick="navigate('hub')">🌍 Global<span>VR</span></div>
+  <div class="nav-right" id="nav-right"></div>
+</nav>
+
+<!-- ══════════════════════════════════════════
+     PAGE: LANDING
+══════════════════════════════════════════ -->
+<div id="page-landing" class="page active">
+  <div class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-pill">🥽 Web-Based VR Travel</div>
+    <h1>Travel the World<br/><span class="hl">Without Leaving</span><br/><span class="dim">Your Chair.</span></h1>
+    <p>Immersive 360° destinations, day/night cycles, bookings, and personalized favorites — all in your browser.</p>
+    <div class="hero-btns">
+      <button class="btn btn-primary" onclick="navigate('auth','login')">Get Started &rarr;</button>
+      <button class="btn btn-ghost" onclick="navigate('auth','login')">Sign In</button>
+    </div>
+  </div>
+  <div class="features">
+    <div class="features-grid">
+      <div class="feat"><div class="feat-icon">🌎</div><h3>360° Destinations</h3><p>Beach, Mountains, Space, Historical — explore curated immersive environments.</p></div>
+      <div class="feat"><div class="feat-icon">🌗</div><h3>Day / Night Cycle</h3><p>Toggle the atmosphere inside any VR scene for a completely different experience.</p></div>
+      <div class="feat"><div class="feat-icon">⭐</div><h3>Smart Favorites</h3><p>Bookmark your most-loved viewpoints and return instantly anytime.</p></div>
+      <div class="feat"><div class="feat-icon">📅</div><h3>VR Session Booking</h3><p>Schedule immersive sessions with date and time selection — manage everything in one place.</p></div>
+      <div class="feat"><div class="feat-icon">🔐</div><h3>Secure Auth</h3><p>JWT-based authentication with forgot-password flow and admin controls.</p></div>
+      <div class="feat"><div class="feat-icon">👑</div><h3>Admin Dashboard</h3><p>Manage destinations, view all users, block/unblock accounts from a dedicated panel.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PAGE: AUTH
+══════════════════════════════════════════ -->
+<div id="page-auth" class="page">
+  <!-- Visual side -->
+  <div class="auth-visual">
+    <div class="auth-vis-glow"></div>
+    <div class="auth-vis-content">
+      <h2>See the World<br/>in <em>360°</em></h2>
+      <p>The world's most iconic destinations, rendered in immersive VR — right inside your browser. No headset required.</p>
+      <div class="auth-dots" id="auth-dots"></div>
+    </div>
+  </div>
+  <!-- Form side -->
+  <div class="auth-form-side">
+    <div class="auth-box">
+      <!-- LOGIN -->
+      <div id="auth-login">
+        <h2>Welcome back</h2>
+        <p class="auth-sub">Sign in to continue exploring.</p>
+        <div class="auth-err" id="login-err"></div>
+        <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="you@example.com"/></div>
+        <div class="form-group pwd-wrap">
+          <label>Password</label>
+          <input type="password" id="login-pass" placeholder="••••••••"/>
+          <button type="button" class="pwd-toggle" onclick="togglePassword('login-pass', this)" aria-label="Toggle password visibility">👁️</button>
+          <button class="forgot-link" onclick="showForgot()">Forgot password?</button>
+        </div>
+        <button class="btn btn-primary" style="width:100%" id="login-btn" onclick="doLogin()">Sign In</button>
+        <div class="auth-toggle">Don't have an account? <button onclick="showRegister()">Create one</button></div>
+      </div>
+
+      <!-- REGISTER -->
+      <div id="auth-register" style="display:none;">
+        <h2>Create account</h2>
+        <p class="auth-sub">Join Global VR — it's free.</p>
+        <div class="auth-err" id="reg-err"></div>
+        <div class="form-group"><label>Full Name</label><input type="text" id="reg-name" placeholder="Jane Doe"/></div>
+        <div class="form-group"><label>Email</label><input type="email" id="reg-email" placeholder="you@example.com"/></div>
+        <div class="form-group pwd-wrap">
+          <label>Password</label>
+          <input type="password" id="reg-pass" placeholder="Min 6 chars, 1 uppercase, 1 number"/>
+          <button type="button" class="pwd-toggle" onclick="togglePassword('reg-pass', this)" aria-label="Toggle password visibility">👁️</button>
+          <p class="pwd-hint">Must be at least 6 characters, include 1 uppercase letter and 1 number.</p>
+        </div>
+        <button class="btn btn-primary" style="width:100%" id="reg-btn" onclick="doRegister()">Create Account</button>
+        <div class="auth-toggle">Already have an account? <button onclick="showLogin()">Sign in</button></div>
+      </div>
+
+      <!-- FORGOT PASSWORD -->
+      <div id="auth-forgot" style="display:none;">
+        <h2>Reset Password</h2>
+        <p class="auth-sub">Enter your email to receive a reset token.</p>
+        <div class="auth-err" id="forgot-err"></div>
+        <div class="form-group"><label>Email</label><input type="email" id="forgot-email" placeholder="you@example.com"/></div>
+        <button class="btn btn-primary" style="width:100%" id="forgot-btn" onclick="doForgot()">Send Reset Token</button>
+        <!-- Reset form appears after token is received -->
+        <div id="reset-section" style="display:none;margin-top:1.5rem;border-top:1px solid var(--border);padding-top:1.5rem;">
+          <p style="font-size:.85rem;color:var(--muted);margin-bottom:1rem;">Enter the token you received and your new password.</p>
+          <div class="form-group"><label>Reset Token</label><input type="text" id="reset-token" placeholder="Paste token here"/></div>
+          <div class="form-group pwd-wrap"><label>New Password</label><input type="password" id="reset-pass" placeholder="New password"/><button type="button" class="pwd-toggle" onclick="togglePassword('reset-pass', this)" aria-label="Toggle password visibility">👁️</button></div>
+          <button class="btn btn-primary" style="width:100%" onclick="doReset()">Reset Password</button>
+        </div>
+        <div class="auth-toggle"><button onclick="showLogin()">← Back to Sign In</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PAGE: DESTINATION HUB
+══════════════════════════════════════════ -->
+<div id="page-hub" class="page">
+  <div class="hub-header">
+    <h1>Destination Hub</h1>
+    <p>Choose your next virtual adventure</p>
+    <div class="hub-controls">
+      <div class="hub-search">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="hub-search" placeholder="Search destinations…" oninput="filterDestinations()"/>
+      </div>
+      <div class="cat-filter">
+        <button class="cat-btn active" data-cat="All" onclick="setCat(this,'All')">All</button>
+        <button class="cat-btn" data-cat="Beach" onclick="setCat(this,'Beach')">🏖 Beach</button>
+        <button class="cat-btn" data-cat="Mountains" onclick="setCat(this,'Mountains')">⛰ Mountains</button>
+        <button class="cat-btn" data-cat="Space" onclick="setCat(this,'Space')">🚀 Space</button>
+        <button class="cat-btn" data-cat="Historical" onclick="setCat(this,'Historical')">🏛 Historical</button>
+      </div>
+    </div>
+  </div>
+  <div class="hub-body">
+    <div id="hub-loading" style="text-align:center;padding:4rem;color:var(--muted);"><div class="spin" style="width:30px;height:30px;margin:0 auto 1rem;"></div>Loading destinations…</div>
+    <div id="hub-grid" class="dest-grid" style="display:none;"></div>
+    <div id="hub-empty" class="empty" style="display:none;"><div class="empty-icon">🌐</div><p>No destinations found.</p></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PAGE: FAVORITES
+══════════════════════════════════════════ -->
+<div id="page-favorites" class="page">
+  <div class="inner-page">
+    <div class="section-hd">
+      <div><h2>⭐ My Favorites</h2><p style="color:var(--muted);font-size:.875rem;margin-top:.25rem;">Saved destinations you love</p></div>
+    </div>
+    <div id="fav-loading" style="text-align:center;padding:3rem;color:var(--muted);"><div class="spin" style="width:28px;height:28px;margin:0 auto 1rem;"></div>Loading…</div>
+    <div id="fav-grid" class="dest-grid" style="display:none;"></div>
+    <div id="fav-empty" class="empty" style="display:none;"><div class="empty-icon">💔</div><p>No favorites yet. Explore and heart a destination!</p></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PAGE: BOOKINGS
+══════════════════════════════════════════ -->
+<div id="page-bookings" class="page">
+  <div class="inner-page">
+    <div class="section-hd">
+      <div><h2>📅 My Bookings</h2><p style="color:var(--muted);font-size:.875rem;margin-top:.25rem;">Your scheduled VR sessions</p></div>
+    </div>
+    <div id="book-loading" style="text-align:center;padding:3rem;color:var(--muted);"><div class="spin" style="width:28px;height:28px;margin:0 auto 1rem;"></div>Loading…</div>
+    <div id="book-table-wrap" style="display:none;">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Destination</th><th>Category</th><th>Date</th><th>Time</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody id="book-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div id="book-empty" class="empty" style="display:none;"><div class="empty-icon">📭</div><p>No bookings yet. Book a VR session from the Destination Hub!</p></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PAGE: PROFILE
+══════════════════════════════════════════ -->
+<div id="page-profile" class="page">
+  <div class="inner-page" style="max-width:600px;">
+    <div class="section-hd"><div><h2>👤 My Profile</h2></div></div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem;">
+      <div style="display:flex;align-items:center;gap:1.25rem;margin-bottom:2rem;">
+        <div class="nav-avatar" id="profile-avatar" style="width:60px;height:60px;font-size:1.4rem;"></div>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:700;" id="profile-name">—</div>
+          <div style="font-size:.875rem;color:var(--muted);" id="profile-email">—</div>
+          <div style="margin-top:.4rem;" id="profile-role-badge"></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div style="background:var(--surface);border-radius:10px;padding:1rem;text-align:center;">
+          <div style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:var(--accent);" id="profile-fav-count">—</div>
+          <div style="font-size:.8rem;color:var(--muted);margin-top:.2rem;">Favorites</div>
+        </div>
+        <div style="background:var(--surface);border-radius:10px;padding:1rem;text-align:center;">
+          <div style="font-family:'Syne',sans-serif;font-size:1.6rem;font-weight:800;color:var(--accent2);" id="profile-book-count">—</div>
+          <div style="font-size:.8rem;color:var(--muted);margin-top:.2rem;">Bookings</div>
+        </div>
+      </div>
+      <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border);display:flex;gap:.75rem;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" onclick="navigate('favorites')">⭐ View Favorites</button>
+        <button class="btn btn-ghost btn-sm" onclick="navigate('bookings')">📅 View Bookings</button>
+        <button class="btn btn-danger btn-sm" onclick="doLogout()" style="margin-left:auto;">Sign Out</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PAGE: ADMIN
+══════════════════════════════════════════ -->
+<div id="page-admin" class="page">
+  <div class="admin-wrap">
+    <aside class="admin-sidebar">
+      <h3>Admin Panel</h3>
+      <button class="admin-nav-btn active" onclick="adminTab(this,'admin-overview')">📊 Overview</button>
+      <button class="admin-nav-btn" onclick="adminTab(this,'admin-destinations')">🌍 Destinations</button>
+      <button class="admin-nav-btn" onclick="adminTab(this,'admin-users')">👥 Users</button>
+    </aside>
+    <div class="admin-content">
+
+      <!-- OVERVIEW -->
+      <div id="admin-overview" class="admin-panel active">
+        <div class="section-hd"><div><h2>Overview</h2><p style="color:var(--muted);font-size:.875rem;margin-top:.2rem;">System at a glance</p></div></div>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-val" id="stat-users">—</div><div class="stat-label">Total Users</div></div>
+          <div class="stat-card"><div class="stat-val" id="stat-dests">—</div><div class="stat-label">Destinations</div></div>
+          <div class="stat-card"><div class="stat-val" id="stat-blocked">—</div><div class="stat-label">Blocked Users</div></div>
+        </div>
+        <p style="color:var(--muted);font-size:.875rem;">Use the sidebar to manage destinations and users.</p>
+      </div>
+
+      <!-- DESTINATIONS -->
+      <div id="admin-destinations" class="admin-panel">
+        <div class="section-hd">
+          <div><h2>Destinations</h2></div>
+          <button class="btn btn-primary btn-sm" onclick="openDestModal()">+ Add Destination</button>
+        </div>
+        <div id="admin-dest-loading" style="text-align:center;padding:3rem;color:var(--muted);"><div class="spin" style="width:26px;height:26px;margin:0 auto 1rem;"></div></div>
+        <div class="table-wrap" id="admin-dest-table" style="display:none;">
+          <table>
+            <thead><tr><th>Name</th><th>Category</th><th>Price</th><th>Duration</th><th>Rating</th><th>Actions</th></tr></thead>
+            <tbody id="admin-dest-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- USERS -->
+      <div id="admin-users" class="admin-panel">
+        <div class="section-hd"><div><h2>Users</h2></div></div>
+        <div id="admin-users-loading" style="text-align:center;padding:3rem;color:var(--muted);"><div class="spin" style="width:26px;height:26px;margin:0 auto 1rem;"></div></div>
+        <div class="table-wrap" id="admin-users-table" style="display:none;">
+          <table>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="admin-users-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     VR OVERLAY (outside page system)
+══════════════════════════════════════════ -->
+<div id="page-vr" class="page"></div>
+
+<!-- VR FULLSCREEN OVERLAY -->
+<div id="vr-overlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:10000;background:#000;">
+
+  <!-- TOP BAR -->
+  <div style="position:fixed;top:0;left:0;right:0;z-index:10002;pointer-events:none;">
+    <div style="pointer-events:all;display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;background:linear-gradient(to bottom,rgba(4,6,15,.95),transparent);">
+      <button class="btn btn-ghost btn-sm" onclick="closeVR()">← Back</button>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:.2rem;">
+        <span id="vr-dest-name" style="font-family:Syne,sans-serif;font-size:1.1rem;font-weight:700;color:#00ffe0;"></span>
+        <span id="vr-model-credit" style="font-size:.7rem;color:#5a6a8a;"></span>
+      </div>
+      <div style="display:flex;gap:.5rem;">
+        <button class="btn btn-ghost btn-sm" id="vr-fav-btn" onclick="toggleVrFav()">☆ Favorite</button>
+        <button class="btn btn-primary btn-sm" onclick="openBookingModal()">📅 Book Session</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM CONTROLS -->
+  <div style="position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:10002;display:flex;gap:.75rem;background:rgba(4,6,15,.75);backdrop-filter:blur(12px);border:1px solid #1a2540;border-radius:50px;padding:.5rem 1.25rem;">
+    <button onclick="vrFullscreen()" style="background:none;border:none;color:#aaa;font-size:.85rem;cursor:pointer;padding:.35rem .75rem;border-radius:20px;font-family:DM Sans,sans-serif;">⛶ Fullscreen</button>
+    <button onclick="switchVRModel(-1)" style="background:none;border:none;color:#aaa;font-size:.85rem;cursor:pointer;padding:.35rem .75rem;border-radius:20px;font-family:DM Sans,sans-serif;">◀ Prev Model</button>
+    <button onclick="switchVRModel(1)" style="background:none;border:none;color:#aaa;font-size:.85rem;cursor:pointer;padding:.35rem .75rem;border-radius:20px;font-family:DM Sans,sans-serif;">Next Model ▶</button>
+  </div>
+
+  <!-- LOADING INDICATOR -->
+  <div id="vr-loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10001;text-align:center;color:#00ffe0;font-family:Syne,sans-serif;">
+    <div style="width:50px;height:50px;border:3px solid rgba(0,255,224,.2);border-top-color:#00ffe0;border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 1rem;"></div>
+    <p style="font-size:.95rem;font-weight:700;">Loading VR Scene…</p>
+    <p style="font-size:.75rem;color:#5a6a8a;margin-top:.4rem;">Powered by Sketchfab</p>
+  </div>
+
+  <!-- SKETCHFAB IFRAME -->
+  <iframe
+    id="vr-iframe"
+    frameborder="0"
+    allowfullscreen
+    mozallowfullscreen="true"
+    webkitallowfullscreen="true"
+    allow="autoplay; fullscreen; xr-spatial-tracking"
+    xr-spatial-tracking
+    execution-while-out-of-viewport
+    execution-while-not-rendered
+    web-share
+    style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;z-index:10000;"
+    onload="document.getElementById('vr-loading').style.display='none';"
+    src="">
+  </iframe>
+
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODAL: BOOK SESSION
+══════════════════════════════════════════ -->
+<div id="modal-booking" class="modal-bg">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal('modal-booking')">×</button>
+    <h2>📅 Book VR Session</h2>
+    <p style="font-size:.875rem;color:var(--muted);margin-bottom:1.5rem;">Destination: <strong id="book-dest-label" style="color:var(--accent);">—</strong></p>
+    <div class="form-group"><label>Session Date</label><input type="date" id="book-date"/></div>
+    <div class="form-group">
+      <label>Session Time</label>
+      <select id="book-time">
+        <option value="">Choose a time slot</option>
+        <option>09:00 AM</option><option>10:00 AM</option><option>11:00 AM</option>
+        <option>12:00 PM</option><option>02:00 PM</option><option>03:00 PM</option>
+        <option>04:00 PM</option><option>06:00 PM</option><option>07:00 PM</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:.75rem;justify-content:flex-end;margin-top:.5rem;">
+      <button class="btn btn-ghost" onclick="closeModal('modal-booking')">Cancel</button>
+      <button class="btn btn-primary" id="book-submit-btn" onclick="submitBooking()">Confirm Booking</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODAL: ADD / EDIT DESTINATION (Admin)
+══════════════════════════════════════════ -->
+<div id="modal-dest" class="modal-bg">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal('modal-dest')">×</button>
+    <h2 id="dest-modal-title">Add Destination</h2>
+    <input type="hidden" id="dest-edit-id"/>
+    <div class="form-group"><label>Name</label><input type="text" id="dest-name" placeholder="e.g. Bali Sunrise Beach"/></div>
+    <div class="form-group"><label>Description</label><textarea id="dest-desc" placeholder="Brief description…"></textarea></div>
+    <div class="form-group">
+      <label>Category</label>
+      <select id="dest-cat">
+        <option value="">Select category</option>
+        <option value="Beach">Beach</option>
+        <option value="Mountains">Mountains</option>
+        <option value="Space">Space</option>
+        <option value="Historical">Historical</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+      <div class="form-group"><label>Price (₹)</label><input type="number" id="dest-price" placeholder="499"/></div>
+      <div class="form-group"><label>Duration</label><input type="text" id="dest-duration" placeholder="30 mins"/></div>
+    </div>
+    <div class="form-group"><label>Image URL (360°)</label><input type="text" id="dest-image" placeholder="https://…"/></div>
+    <div style="display:flex;gap:.75rem;justify-content:flex-end;margin-top:.5rem;">
+      <button class="btn btn-ghost" onclick="closeModal('modal-dest')">Cancel</button>
+      <button class="btn btn-primary" id="dest-save-btn" onclick="saveDestination()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════ -->
+<script>
+const API = 'https://global-vr-app-3.onrender.com/api';
+let state = {
+  token: localStorage.getItem('gvr_token') || null,
+  user: JSON.parse(localStorage.getItem('gvr_user') || 'null'),
+  destinations: [],
+  favorites: [],
+  bookings: [],
+  currentDest: null,
+  filterCat: 'All',
+  isDay: true,
+};
+
+// Default images for known destinations (when destination.image is missing)
+const DEFAULT_DEST_IMAGES = {
+  'maldives vr': 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1400&q=80',
+  'swiss alps vr': 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1400&q=80',
+  'mars colony vr': 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1400&q=80',
+  'ancient rome vr': 'https://images.unsplash.com/photo-1508057198894-247b23fe5ade?auto=format&fit=crop&w=1400&q=80',
+  'tokyo night vr': 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=1400&q=80',
+  'amazon rainforest vr': 'https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=1400&q=80',
+  'great wall of china vr': 'https://images.unsplash.com/photo-1563720220906-6f3d2b6058ac?auto=format&fit=crop&w=1400&q=80',
+  // Petra: user-provided image
+  'petra vr': 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTRMaOV7fBkCmEZz_33SI5ETmNOEBxYHp5Rgk82P_bZpRA9CC37nm9xC3s&s',
+  // Chichén Itzá aliases (with/without accents) to handle diacritic mismatches
+  'chichén itzá vr': 'https://www.istockphoto.com/photos/chichen-itza',
+  'chichen itza vr': 'https://www.istockphoto.com/photos/chichen-itza',
+  'taj mahal vr': 'https://upload.wikimedia.org/wikipedia/commons/d/da/Taj-Mahal.jpg',
+  // Eiffel Tower: replaced with user's Pinterest image
+  'eiffel tower vr': 'https://i.pinimg.com/736x/76/30/92/76309217422ce2812f5150a4496a1571.jpg',
+  'machu picchu vr': 'https://images.unsplash.com/photo-1549692520-acc6669e2f0c?auto=format&fit=crop&w=1400&q=80',
+  'roman colosseum vr': 'https://images.unsplash.com/photo-1477587458883-47145ed94245?auto=format&fit=crop&w=1400&q=80',
+};
+
+// Category-level fallbacks when a specific destination image isn't available
+const CATEGORY_IMAGES = {
+  Beach: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1400&q=80',
+  Mountains: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1400&q=80',
+  Space: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1400&q=80',
+  Historical: 'https://images.unsplash.com/photo-1508057198894-247b23fe5ade?auto=format&fit=crop&w=1400&q=80',
+};
+
+function resolveImage(d) {
+  if (!d) return null;
+  // explicit image provided
+  if (d.image) {
+    // allow full URLs, absolute paths or local asset paths (assets/...)
+    if (/^(https?:\/\/|\/|assets\/)/.test(d.image)) return d.image;
+    return `${API.replace('/api','')}/${d.image.replace(/^\//, '')}`;
+  }
+  const name = (d.name || '').toLowerCase();
+  if (DEFAULT_DEST_IMAGES[name]) return DEFAULT_DEST_IMAGES[name];
+  // try substring matching (e.g., 'taj', 'maldives')
+  for (const key of Object.keys(DEFAULT_DEST_IMAGES)) {
+    const base = key.replace(/\s*vr\s*$/, '').trim();
+    if (base && name.includes(base)) return DEFAULT_DEST_IMAGES[key];
+  }
+  // fallback by category
+  if (d.category && CATEGORY_IMAGES[d.category]) return CATEGORY_IMAGES[d.category];
+  return null;
+}
+
+// ── HELPERS ──────────────────────────────────────────────
+function toast(msg, type='info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  const icons = {success:'✅', error:'❌', info:'ℹ️'};
+  el.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
+  document.getElementById('toast-wrap').appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+async function api(path, method='GET', body=null, auth=true) {
+  const headers = {'Content-Type':'application/json'};
+  if (auth && state.token) headers['Authorization'] = `Bearer ${state.token}`;
+  const opts = {method, headers};
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(`${API}${path}`, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || 'Request failed');
+  return data;
+}
+
+function setBtn(id, loading, text) {
+  const b = document.getElementById(id);
+  if (!b) return;
+  b.disabled = loading;
+  b.innerHTML = loading ? `<span class="spin"></span> ${text}` : text;
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+
+// ── NAVIGATION ────────────────────────────────────────────
+function navigate(page, sub='') {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const el = document.getElementById(`page-${page}`);
+  if (el) el.classList.add('active');
+
+  // navbar visibility
+  const noNav = ['landing','auth','vr'];
+  document.getElementById('navbar').style.display = noNav.includes(page) ? 'none' : 'flex';
+
+  // highlight nav
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active-link'));
+  const match = document.querySelector(`.nav-btn[data-page="${page}"]`);
+  if (match) match.classList.add('active-link');
+
+  if (page === 'landing') return;
+  if (page === 'auth') { renderAuthPage(sub); return; }
+  if (page === 'hub') { loadDestinations(); return; }
+  if (page === 'favorites') { loadFavorites(); return; }
+  if (page === 'bookings') { loadBookings(); return; }
+  if (page === 'profile') { renderProfile(); return; }
+  if (page === 'admin') { loadAdminData(); return; }
+}
+
+// ── NAVBAR RENDER ──────────────────────────────────────────
+function renderNav() {
+  const nr = document.getElementById('nav-right');
+  if (!state.user) { nr.innerHTML = ''; return; }
+  const initials = state.user.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  const adminBtn = state.user.role === 'admin'
+    ? `<button class="nav-btn" data-page="admin" onclick="navigate('admin')">👑 Admin</button>` : '';
+  nr.innerHTML = `
+    <button class="nav-btn" data-page="hub" onclick="navigate('hub')">Explore</button>
+    <button class="nav-btn" data-page="favorites" onclick="navigate('favorites')">Favorites</button>
+    <button class="nav-btn" data-page="bookings" onclick="navigate('bookings')">Bookings</button>
+    ${adminBtn}
+    <button class="nav-btn" data-page="profile" onclick="navigate('profile')" style="display:flex;align-items:center;gap:.5rem;">
+      <div class="nav-avatar">${initials}</div>
+      <span class="nav-name">${state.user.name.split(' ')[0]}</span>
+    </button>
+  `;
+}
+
+// ── AUTH PAGE ─────────────────────────────────────────────
+function renderAuthPage(sub='login') {
+  // generate dots
+  const dots = document.getElementById('auth-dots');
+  if (dots && !dots.children.length) {
+    for (let i=0;i<50;i++) { const s=document.createElement('span'); dots.appendChild(s); }
+  }
+  if (sub==='login') showLogin();
+  else if (sub==='register') showRegister();
+}
+
+function showLogin() {
+  document.getElementById('auth-login').style.display='block';
+  document.getElementById('auth-register').style.display='none';
+  document.getElementById('auth-forgot').style.display='none';
+}
+function showRegister() {
+  document.getElementById('auth-login').style.display='none';
+  document.getElementById('auth-register').style.display='block';
+  document.getElementById('auth-forgot').style.display='none';
+}
+function showForgot() {
+  document.getElementById('auth-login').style.display='none';
+  document.getElementById('auth-register').style.display='none';
+  document.getElementById('auth-forgot').style.display='block';
+}
+
+function showAuthErr(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.classList.add('show');
+}
+function hideAuthErr(id) { document.getElementById(id).classList.remove('show'); }
+
+// Toggle password visibility for inputs
+function togglePassword(id, btn) {
+  const inp = document.getElementById(id);
+  if (!inp) return;
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+  else { inp.type = 'password'; btn.textContent = '👁️'; }
+  inp.focus();
+}
+
+async function doLogin() {
+  hideAuthErr('login-err');
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-pass').value;
+  if (!email || !password) { showAuthErr('login-err','Please fill in all fields.'); return; }
+  setBtn('login-btn', true, 'Signing in…');
+  try {
+    const data = await api('/auth/login','POST',{email,password},false);
+    state.token = data.token;
+    state.user = data.user;
+    localStorage.setItem('gvr_token', data.token);
+    localStorage.setItem('gvr_user', JSON.stringify(data.user));
+    renderNav();
+    toast(`Welcome back, ${data.user.name}! 🌍`, 'success');
+    navigate('hub');
+  } catch(e) {
+    showAuthErr('login-err', e.message);
+  } finally {
+    setBtn('login-btn', false, 'Sign In');
+  }
+}
+
+async function doRegister() {
+  hideAuthErr('reg-err');
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-pass').value;
+  if (!name||!email||!password) { showAuthErr('reg-err','All fields are required.'); return; }
+  setBtn('reg-btn',true,'Creating account…');
+  try {
+    const data = await api('/auth/register','POST',{name,email,password},false);
+    state.token = data.token;
+    state.user = data.user;
+    localStorage.setItem('gvr_token', data.token);
+    localStorage.setItem('gvr_user', JSON.stringify(data.user));
+    renderNav();
+    toast(`Account created! Welcome, ${data.user.name} 🎉`, 'success');
+    navigate('hub');
+  } catch(e) {
+    showAuthErr('reg-err', e.message);
+  } finally {
+    setBtn('reg-btn',false,'Create Account');
+  }
+}
+
+async function doForgot() {
+  hideAuthErr('forgot-err');
+  const email = document.getElementById('forgot-email').value.trim();
+  if (!email) { showAuthErr('forgot-err','Please enter your email.'); return; }
+  setBtn('forgot-btn',true,'Sending…');
+  try {
+    const data = await api('/auth/forgot-password','POST',{email},false);
+    toast('Reset token generated! Check the response below.','success');
+    // Show the token in the reset section (dev mode — in prod this would be emailed)
+    document.getElementById('reset-section').style.display='block';
+    if (data.resetToken) {
+      document.getElementById('reset-token').value = data.resetToken;
+      toast(`Token auto-filled for dev mode.`,'info');
+    }
+  } catch(e) {
+    showAuthErr('forgot-err', e.message);
+  } finally {
+    setBtn('forgot-btn',false,'Send Reset Token');
+  }
+}
+
+async function doReset() {
+  const token = document.getElementById('reset-token').value.trim();
+  const password = document.getElementById('reset-pass').value;
+  if (!token||!password) { toast('Fill in token and new password','error'); return; }
+  try {
+    await api(`/auth/reset-password/${token}`,'PUT',{password},false);
+    toast('Password reset successful! Please sign in.','success');
+    showLogin();
+  } catch(e) {
+    toast(e.message,'error');
+  }
+}
+
+function doLogout() {
+  state.token = null; state.user = null;
+  localStorage.removeItem('gvr_token');
+  localStorage.removeItem('gvr_user');
+  navigate('landing');
+  toast('Signed out successfully.','info');
+}
+
+// ── DESTINATIONS ──────────────────────────────────────────
+async function loadDestinations() {
+  document.getElementById('hub-loading').style.display='block';
+  document.getElementById('hub-grid').style.display='none';
+  document.getElementById('hub-empty').style.display='none';
+  try {
+    state.destinations = await api('/destinations','GET',null,false);
+    if (state.user && state.token) {
+      try { state.favorites = await api('/favorites'); } catch(e) {}
+    }
+    renderDestinations();
+  } catch(e) {
+    toast(e.message,'error');
+  } finally {
+    document.getElementById('hub-loading').style.display='none';
+  }
+}
+
+function catIcon(cat) {
+  return {Beach:'🏖',Mountains:'⛰',Space:'🚀',Historical:'🏛'}[cat] || '🌍';
+}
+
+function isFav(id) { return state.favorites.some(f => (f.destination?._id||f.destination) === id); }
+
+function renderDestinations() {
+  const search = document.getElementById('hub-search')?.value.toLowerCase() || '';
+  const filtered = state.destinations.filter(d => {
+    const catOk = state.filterCat === 'All' || d.category === state.filterCat;
+    const searchOk = !search || d.name.toLowerCase().includes(search) || d.description.toLowerCase().includes(search);
+    return catOk && searchOk;
+  });
+
+  const grid = document.getElementById('hub-grid');
+  const empty = document.getElementById('hub-empty');
+  if (!filtered.length) { grid.style.display='none'; empty.style.display='block'; return; }
+  empty.style.display='none'; grid.style.display='grid';
+  grid.innerHTML = filtered.map(d => destCardHTML(d, true)).join('');
+}
+
+function destCardHTML(d, showActions=true) {
+  const fav = isFav(d._id);
+  const imgSrc = resolveImage(d) || null;
+  // compute a fallback image (prefer named default, then category)
+  const nameKey = (d.name || '').toLowerCase();
+  let defaultImg = DEFAULT_DEST_IMAGES[nameKey] || null;
+  if (!defaultImg) {
+    for (const key of Object.keys(DEFAULT_DEST_IMAGES)) {
+      const base = key.replace(/\s*vr\s*$/, '').trim();
+      if (base && nameKey.includes(base)) { defaultImg = DEFAULT_DEST_IMAGES[key]; break; }
+    }
+  }
+  const categoryImg = (d.category && CATEGORY_IMAGES[d.category]) ? CATEGORY_IMAGES[d.category] : null;
+  const fallbackSrc = defaultImg || categoryImg || '/assets/images/category-beach.svg';
+  // secondary fallback for Live Server setups where assets are under /client/assets
+  const fallbackSrc2 = (fallbackSrc && fallbackSrc.startsWith('/')) ? ('/client' + fallbackSrc) : null;
+  const onerr = "(function(i){ if(!i.dataset.tried){ i.dataset.tried='1'; if(i.dataset.fallback){ i.src=i.dataset.fallback; return; } } else if(i.dataset.tried==='1' && i.dataset.fallback2){ i.dataset.tried='2'; i.src=i.dataset.fallback2; return; } i.style.display='none'; var ph=i.nextElementSibling; if(ph) ph.style.display='flex'; })(this)";
+  const thumb = imgSrc
+    ? `<img class="dest-thumb" src="${imgSrc}" alt="${d.name}" data-fallback="${fallbackSrc}" data-fallback2="${fallbackSrc2||''}" onerror="${onerr}"/><div class="dest-thumb-ph" style="display:none;">${catIcon(d.category)}</div>`
+    : `<div class="dest-thumb-ph">${catIcon(d.category)}</div>`;
+  const actions = showActions ? `
+    <div class="dest-actions">
+      <button class="btn btn-primary btn-sm" onclick="openVR('${d._id}')">🥽 Explore</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleFav('${d._id}',this)">${fav?'❤️ Saved':'☆ Save'}</button>
+      <button class="btn btn-outline btn-sm" onclick="openBookingFromHub('${d._id}')">📅 Book</button>
+    </div>` : '';
+  return `
+    <div class="dest-card">
+      ${thumb}
+      <div class="dest-body">
+        <div class="dest-name">${d.name}</div>
+        <div class="dest-desc">${d.description}</div>
+        <div class="dest-meta">
+          <span class="badge badge-teal">${catIcon(d.category)} ${d.category}</span>
+          <span class="badge badge-purple">⏱ ${d.duration}</span>
+          ${d.rating ? `<span class="badge badge-yellow">⭐ ${d.rating}</span>` : ''}
+        </div>
+        <div class="dest-price">₹${d.price}</div>
+      </div>
+      ${actions}
+    </div>`;
+}
+
+function filterDestinations() { renderDestinations(); }
+function setCat(btn, cat) {
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  state.filterCat = cat;
+  renderDestinations();
+}
+
+// ── FAVORITES ────────────────────────────────────────────
+async function toggleFav(destId, btn) {
+  if (!state.token) { toast('Please sign in first','error'); return; }
+  const already = isFav(destId);
+  try {
+    if (already) {
+      await api(`/favorites/${destId}`,'DELETE');
+      state.favorites = state.favorites.filter(f => (f.destination?._id||f.destination) !== destId);
+      if(btn) btn.innerHTML='☆ Save';
+      toast('Removed from favorites','info');
+    } else {
+      const fav = await api(`/favorites/${destId}`,'POST');
+      state.favorites.push(fav);
+      if(btn) btn.innerHTML='❤️ Saved';
+      toast('Added to favorites ❤️','success');
+    }
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function loadFavorites() {
+  document.getElementById('fav-loading').style.display='block';
+  document.getElementById('fav-grid').style.display='none';
+  document.getElementById('fav-empty').style.display='none';
+  try {
+    state.favorites = await api('/favorites');
+    const grid = document.getElementById('fav-grid');
+    const empty = document.getElementById('fav-empty');
+    document.getElementById('fav-loading').style.display='none';
+    if (!state.favorites.length) { empty.style.display='block'; return; }
+    grid.style.display='grid';
+    grid.innerHTML = state.favorites.map(f => {
+      const d = f.destination;
+      if (!d) return '';
+      const imgSrc = resolveImage(d) || null;
+      // compute a fallback like in destCardHTML
+      const nameKeyFav = (d.name || '').toLowerCase();
+      let defaultImgFav = DEFAULT_DEST_IMAGES[nameKeyFav] || null;
+      if (!defaultImgFav) {
+        for (const key of Object.keys(DEFAULT_DEST_IMAGES)) {
+          const base = key.replace(/\s*vr\s*$/, '').trim();
+          if (base && nameKeyFav.includes(base)) { defaultImgFav = DEFAULT_DEST_IMAGES[key]; break; }
+        }
+      }
+      const categoryImgFav = (d.category && CATEGORY_IMAGES[d.category]) ? CATEGORY_IMAGES[d.category] : null;
+      const fallbackFav = defaultImgFav || categoryImgFav || '/assets/images/category-beach.svg';
+      const fallbackFav2 = (fallbackFav && fallbackFav.startsWith('/')) ? ('/client' + fallbackFav) : null;
+      const onerrFav = "(function(i){ if(!i.dataset.tried){ i.dataset.tried='1'; if(i.dataset.fallback){ i.src=i.dataset.fallback; return; } } else if(i.dataset.tried==='1' && i.dataset.fallback2){ i.dataset.tried='2'; i.src=i.dataset.fallback2; return; } i.style.display='none'; var ph=i.nextElementSibling; if(ph) ph.style.display='flex'; })(this)";
+      const thumb = imgSrc
+        ? `<img class="dest-thumb" src="${imgSrc}" alt="${d.name}" data-fallback="${fallbackFav}" data-fallback2="${fallbackFav2||''}" onerror="${onerrFav}"/><div class="dest-thumb-ph" style="display:none;">${catIcon(d.category)}</div>`
+        : `<div class="dest-thumb-ph">${catIcon(d.category)}</div>`;
+      return `
+        <div class="dest-card">
+          ${thumb}
+          <div class="dest-body">
+            <div class="dest-name">${d.name}</div>
+            <div class="dest-desc">${d.description}</div>
+            <div class="dest-meta">
+              <span class="badge badge-teal">${catIcon(d.category)} ${d.category}</span>
+              <span class="badge badge-purple">⏱ ${d.duration}</span>
+            </div>
+            <div class="dest-price">₹${d.price}</div>
+          </div>
+          <div class="dest-actions">
+            <button class="btn btn-primary btn-sm" onclick="openVR('${d._id}')">🥽 Explore</button>
+            <button class="btn btn-danger btn-sm" onclick="removeFavFromList('${d._id}',this)">💔 Remove</button>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('fav-loading').style.display='none';
+    toast(e.message,'error');
+  }
+}
+
+async function removeFavFromList(destId, btn) {
+  try {
+    await api(`/favorites/${destId}`,'DELETE');
+    state.favorites = state.favorites.filter(f => (f.destination?._id||f.destination) !== destId);
+    btn.closest('.dest-card').remove();
+    if (!state.favorites.length) document.getElementById('fav-empty').style.display='block';
+    toast('Removed from favorites','info');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ── BOOKINGS ─────────────────────────────────────────────
+async function loadBookings() {
+  document.getElementById('book-loading').style.display='block';
+  document.getElementById('book-table-wrap').style.display='none';
+  document.getElementById('book-empty').style.display='none';
+  try {
+    state.bookings = await api('/bookings');
+    document.getElementById('book-loading').style.display='none';
+    if (!state.bookings.length) { document.getElementById('book-empty').style.display='block'; return; }
+    document.getElementById('book-table-wrap').style.display='block';
+    const tbody = document.getElementById('book-tbody');
+    tbody.innerHTML = state.bookings.map(b => {
+      const d = b.destination;
+      const date = b.bookingDate ? new Date(b.bookingDate).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+      const statusClass = b.status === 'Booked' ? 'badge-green' : 'badge-red';
+      const cancelBtn = b.status === 'Booked'
+        ? `<button class="btn btn-danger btn-sm" onclick="cancelBooking('${b._id}',this)">Cancel</button>` : '—';
+      return `<tr>
+        <td><strong>${d?.name || '—'}</strong></td>
+        <td><span class="badge badge-teal">${d?.category || '—'}</span></td>
+        <td>${date}</td>
+        <td>${b.sessionTime}</td>
+        <td><span class="badge ${statusClass}">${b.status}</span></td>
+        <td>${cancelBtn}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('book-loading').style.display='none';
+    toast(e.message,'error');
+  }
+}
+
+function openBookingFromHub(destId) {
+  state.currentDest = state.destinations.find(d => d._id === destId);
+  openBookingModal();
+}
+
+function openBookingModal() {
+  if (!state.user) { toast('Please sign in first','error'); return; }
+  if (state.currentDest) {
+    document.getElementById('book-dest-label').textContent = state.currentDest.name;
+  }
+  // set min date to today
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('book-date').min = today;
+  document.getElementById('book-date').value = '';
+  document.getElementById('book-time').value = '';
+  openModal('modal-booking');
+}
+
+async function submitBooking() {
+  const bookingDate = document.getElementById('book-date').value;
+  const sessionTime = document.getElementById('book-time').value;
+  if (!bookingDate || !sessionTime) { toast('Please select date and time','error'); return; }
+  if (!state.currentDest) { toast('No destination selected','error'); return; }
+  setBtn('book-submit-btn',true,'Booking…');
+  try {
+    await api(`/bookings/${state.currentDest._id}`,'POST',{bookingDate,sessionTime});
+    toast('Booking confirmed! 🎉','success');
+    closeModal('modal-booking');
+  } catch(e) { toast(e.message,'error'); }
+  finally { setBtn('book-submit-btn',false,'Confirm Booking'); }
+}
+
+async function cancelBooking(bookingId, btn) {
+  if (!confirm('Cancel this booking?')) return;
+  btn.disabled = true;
+  try {
+    await api(`/bookings/${bookingId}`,'DELETE');
+    toast('Booking cancelled','info');
+    loadBookings();
+  } catch(e) { toast(e.message,'error'); btn.disabled=false; }
+}
+
+// ── PROFILE ──────────────────────────────────────────────
+async function renderProfile() {
+  if (!state.user) return;
+  const u = state.user;
+  const initials = u.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  document.getElementById('profile-avatar').textContent = initials;
+  document.getElementById('profile-name').textContent = u.name;
+  document.getElementById('profile-email').textContent = u.email;
+  document.getElementById('profile-role-badge').innerHTML =
+    u.role === 'admin'
+      ? `<span class="badge badge-purple">👑 Admin</span>`
+      : `<span class="badge badge-teal">🌍 Explorer</span>`;
+  // load counts
+  try {
+    const favs = await api('/favorites');
+    document.getElementById('profile-fav-count').textContent = favs.length;
+  } catch(e) { document.getElementById('profile-fav-count').textContent = '—'; }
+  try {
+    const books = await api('/bookings');
+    document.getElementById('profile-book-count').textContent = books.length;
+  } catch(e) { document.getElementById('profile-book-count').textContent = '—'; }
+}
+
+// ── VR VIEWER ────────────────────────────────────────────
+
+// Sketchfab model library — category → array of {url, title, credit}
+const VR_MODELS = {
+  Historical: [
+    {
+      url: 'https://sketchfab.com/models/f2bf614c5aac4789a30b5c26d24e29d1/embed?autostart=1&ui_theme=dark&ui_infos=0&ui_controls=1&ui_stop=0&preload=1',
+      title: 'Taj Mahal Panorama',
+      credit: 'by Deepak_Sharma on Sketchfab'
+    },
+    {
+      url: 'https://sketchfab.com/models/eb94be2c56a14f009e6f0f2533c996d7/embed?autostart=1&ui_theme=dark&ui_infos=0&ui_controls=1&ui_stop=0&preload=1',
+      title: 'Great Wall Survey',
+      credit: 'by DroneScan China on Sketchfab'
+    }
+  ],
+  Beach: [
+    {
+      url: 'https://sketchfab.com/models/b4bb4c2a41c04193b2b2e61a03f1685c/embed?autostart=1&ui_theme=dark&ui_infos=0&ui_controls=1&ui_stop=0&preload=1',
+      title: 'Tropical Beach Scene',
+      credit: 'on Sketchfab'
+    }
+  ],
+  Mountains: [
+    {
+      url: 'https://sketchfab.com/models/b74b97cd8e984289bc0e4f41c8c0c4df/embed?autostart=1&ui_theme=dark&ui_infos=0&ui_controls=1&ui_stop=0&preload=1',
+      title: 'Mountain Landscape',
+      credit: 'on Sketchfab'
+    }
+  ],
+  Space: [
+    {
+      url: 'https://sketchfab.com/models/f219a6c0fcbc4740bf2d74a2c4c4b6e8/embed?autostart=1&ui_theme=dark&ui_infos=0&ui_controls=1&ui_stop=0&preload=1',
+      title: 'Solar System',
+      credit: 'on Sketchfab'
+    }
+  ]
+};
+
+state.vrModelIndex = 0;
+
+function openVR(destId) {
+  state.currentDest = state.destinations.find(d => d._id === destId);
+  if (!state.currentDest) { toast('Destination not found','error'); return; }
+
+  // Check if this destination has a dedicated walkable VR
+  const name = state.currentDest.name.toLowerCase();
+  if (name.includes('taj mahal')) {
+    const filename = 'taj-mahal-vr.html';
+    const dir = location.pathname.replace(/\/[^/]*$/, '/');
+    const candidates = [
+      dir + filename,
+      dir + 'public/' + filename,
+      '/' + filename,
+      '/public/' + filename,
+      '/client/' + filename,
+      '/client/public/' + filename,
+      '/global-vr-app/client/public/' + filename
+    ];
+    (async () => {
+      for (const p of candidates) {
+        try {
+          const url = p.startsWith('http') ? p : (location.origin + p);
+          const res = await fetch(url, { method: 'HEAD' });
+          if (res.ok) { window.open(url, '_blank'); return; }
+        } catch (e) { }
+      }
+      try { window.open(filename, '_blank'); } catch (e) { }
+    })();
+    return;
+  }
+
+  state.vrModelIndex = 0;
+  document.getElementById('vr-overlay').style.display = 'block';
+  document.getElementById('navbar').style.display = 'none';
+  renderVRScene();
+}
+
+function closeVR() {
+  // Clear iframe src to stop loading
+  document.getElementById('vr-iframe').src = '';
+  document.getElementById('vr-overlay').style.display = 'none';
+  document.getElementById('navbar').style.display = 'flex';
+  navigate('hub');
+}
+
+function switchVRModel(dir) {
+  const d = state.currentDest;
+  if (!d) return;
+  const models = VR_MODELS[d.category] || VR_MODELS['Historical'];
+  state.vrModelIndex = (state.vrModelIndex + dir + models.length) % models.length;
+  loadVRModel();
+  toast(`Model ${state.vrModelIndex + 1} of ${models.length}`, 'info');
+}
+
+function loadVRModel() {
+  const d = state.currentDest;
+  const models = VR_MODELS[d.category] || VR_MODELS['Historical'];
+  const model = models[state.vrModelIndex] || models[0];
+  
+  // Show loading
+  document.getElementById('vr-loading').style.display = 'block';
+  
+  // Set iframe src
+  document.getElementById('vr-iframe').src = model.url;
+  
+  // Update credit
+  document.getElementById('vr-model-credit').textContent = model.credit;
+}
+
+function getLandmarkScene(category) {
+  const stars = Array.from({length:60},(_,i)=>{
+    const x=(Math.sin(i*137.5)*20).toFixed(1);
+    const y=(Math.abs(Math.cos(i*97.3))*14+2).toFixed(1);
+    const z=(-(10+(i%30)*1.2)).toFixed(1);
+    const r=(0.03+(i%5)*0.012).toFixed(3);
+    return `<a-sphere position="${x} ${y} ${z}" radius="${r}" color="#ffffff" material="emissive:#ffffff;emissiveIntensity:1"></a-sphere>`;
+  }).join('');
+
+  const scenes = {
+
+    // ─── HISTORICAL: Egyptian Pyramids + Sphinx + Obelisks ──────
+    Historical: `
+      <a-plane position="0 0 0" rotation="-90 0 0" width="120" height="120" color="#c2924a"></a-plane>
+      <!-- Great Pyramid -->
+      <a-cone position="0 1.5 -14" radius-bottom="6" radius-top="0.05" height="12" color="#d4a853" shadow></a-cone>
+      <a-cone position="0 7.55 -14" radius-bottom="0.3" radius-top="0.01" height="0.5" color="#f0d060" shadow></a-cone>
+      <!-- Second Pyramid -->
+      <a-cone position="-10 1 -22" radius-bottom="5" radius-top="0.05" height="10" color="#c9a040" shadow></a-cone>
+      <!-- Third Pyramid -->
+      <a-cone position="10 0.7 -24" radius-bottom="3.5" radius-top="0.05" height="7" color="#bf9838" shadow></a-cone>
+      <!-- Sphinx body -->
+      <a-box position="8 0.3 -8" width="5" height="1.2" depth="2.5" color="#c9a040" rotation="0 -20 0" shadow></a-box>
+      <!-- Sphinx head -->
+      <a-sphere position="9.8 1.5 -7.3" radius="0.9" color="#c9a040" shadow></a-sphere>
+      <!-- Sphinx headdress -->
+      <a-box position="9.8 2.1 -7.3" width="1.6" height="0.7" depth="1.6" color="#b08020" shadow></a-box>
+      <!-- Sphinx paws -->
+      <a-box position="8.5 0.1 -6.6" width="1" height="0.4" depth="1.2" color="#c9a040" shadow></a-box>
+      <a-box position="11 0.1 -6.8" width="1" height="0.4" depth="1.2" color="#c9a040" shadow></a-box>
+      <!-- Obelisk left -->
+      <a-box position="-4 2 -7" width="0.35" height="5" depth="0.35" color="#e8c870" shadow></a-box>
+      <a-cone position="-4 4.6 -7" radius-bottom="0.22" radius-top="0.01" height="0.7" color="#f5d840" shadow></a-cone>
+      <!-- Obelisk right -->
+      <a-box position="4 2 -7" width="0.35" height="5" depth="0.35" color="#e8c870" shadow></a-box>
+      <a-cone position="4 4.6 -7" radius-bottom="0.22" radius-top="0.01" height="0.7" color="#f5d840" shadow></a-cone>
+      <!-- Palm trees -->
+      <a-cylinder position="-6 1.5 -6" radius="0.12" height="3.5" color="#7a5c30" shadow></a-cylinder>
+      <a-cone position="-6 3.4 -6" radius-bottom="1.1" radius-top="0.05" height="1.6" color="#3a7a30" shadow></a-cone>
+      <a-cylinder position="6 1.5 -6" radius="0.12" height="3.5" color="#7a5c30" shadow></a-cylinder>
+      <a-cone position="6 3.4 -6" radius-bottom="1.1" radius-top="0.05" height="1.6" color="#3a7a30" shadow></a-cone>
+      <!-- Rocks -->
+      <a-sphere position="-2 0.15 -5" radius="0.3" color="#b09060" shadow></a-sphere>
+      <a-sphere position="3 0.1 -4" radius="0.2" color="#a08050" shadow></a-sphere>
+      <!-- Sun -->
+      <a-sphere position="8 12 -30" radius="1.8" color="#ffd700" material="emissive:#ffa500;emissiveIntensity:0.8"></a-sphere>
+      <a-torus position="8 12 -30" radius="2.2" radius-tubular="0.15" color="#ff8800" opacity="0.3"
+        animation="property:rotation;to:0 360 0;loop:true;dur:20000;easing:linear"></a-torus>
+      <a-light type="ambient" color="#ffe8a0" intensity="0.7"></a-light>
+      <a-light type="directional" position="8 12 -10" color="#fff8e0" intensity="1.0"></a-light>
+    `,
+
+    // ─── BEACH: Eiffel Tower on a coastal backdrop ───────────────
+    Beach: `
+      <!-- Ocean -->
+      <a-plane position="0 -0.05 -25" rotation="-90 0 0" width="120" height="80" color="#1a6fa8" opacity="0.9"></a-plane>
+      <!-- Wave -->
+      <a-plane position="0 0.01 -10" rotation="-90 0 0" width="30" height="8" color="#3a9fd8" opacity="0.5"
+        animation="property:position;to:0 0.01 -9;dir:alternate;loop:true;dur:2000;easing:easeInOutSine"></a-plane>
+      <!-- Sand -->
+      <a-plane position="0 0 0" rotation="-90 0 0" width="120" height="40" color="#f0d88a"></a-plane>
+      <!-- Eiffel Tower base legs -->
+      <a-cone position="-2.2 2 -10" radius-bottom="1.2" radius-top="0.1" height="5" color="#8b7355" rotation="0 0 12" shadow></a-cone>
+      <a-cone position="2.2 2 -10" radius-bottom="1.2" radius-top="0.1" height="5" color="#8b7355" rotation="0 0 -12" shadow></a-cone>
+      <a-cone position="0 2 -12.2" radius-bottom="1.2" radius-top="0.1" height="5" color="#7a6344" rotation="-12 0 0" shadow></a-cone>
+      <a-cone position="0 2 -7.8" radius-bottom="1.2" radius-top="0.1" height="5" color="#7a6344" rotation="12 0 0" shadow></a-cone>
+      <!-- First platform -->
+      <a-box position="0 4.5 -10" width="2.5" height="0.3" depth="2.5" color="#6b5a3e" shadow></a-box>
+      <!-- Second section -->
+      <a-cone position="0 7 -10" radius-bottom="1.0" radius-top="0.3" height="5" color="#8b7355" shadow></a-cone>
+      <!-- Second platform -->
+      <a-box position="0 9.6 -10" width="1.4" height="0.25" depth="1.4" color="#6b5a3e" shadow></a-box>
+      <!-- Spire -->
+      <a-cone position="0 12 -10" radius-bottom="0.5" radius-top="0.02" height="5" color="#9a8060" shadow></a-cone>
+      <!-- Antenna -->
+      <a-cylinder position="0 14.8 -10" radius="0.03" height="1.2" color="#c0a060" shadow></a-cylinder>
+      <!-- Lattice rings -->
+      <a-torus position="0 5 -10" radius="1.1" radius-tubular="0.06" color="#7a6344" rotation="90 0 0" opacity="0.8"></a-torus>
+      <a-torus position="0 9.8 -10" radius="0.65" radius-tubular="0.05" color="#7a6344" rotation="90 0 0" opacity="0.8"></a-torus>
+      <!-- Palm trees -->
+      <a-cylinder position="-7 1.5 -5" radius="0.13" height="4" color="#8b6030" shadow></a-cylinder>
+      <a-cone position="-6.5 3.8 -5" radius-bottom="1.4" radius-top="0.05" height="2" color="#2d8a30" shadow></a-cone>
+      <a-cylinder position="7 1.5 -5" radius="0.13" height="4" color="#8b6030" shadow></a-cylinder>
+      <a-cone position="7.5 3.8 -5" radius-bottom="1.4" radius-top="0.05" height="2" color="#2d8a30" shadow></a-cone>
+      <!-- Beach umbrellas -->
+      <a-cone position="-3 0.9 -3.5" radius-bottom="1.3" radius-top="0.1" height="0.4" color="#e05050" shadow></a-cone>
+      <a-cylinder position="-3 0.4 -3.5" radius="0.04" height="1.2" color="#c0a060" shadow></a-cylinder>
+      <a-cone position="3.5 0.9 -4" radius-bottom="1.3" radius-top="0.1" height="0.4" color="#4080e0" shadow></a-cone>
+      <a-cylinder position="3.5 0.4 -4" radius="0.04" height="1.2" color="#c0a060" shadow></a-cylinder>
+      <!-- Seagulls -->
+      <a-plane position="-5 4 -12" width="0.8" height="0.3" color="#ffffff" rotation="0 30 10"
+        animation="property:position;to:-3 5 -14;dir:alternate;loop:true;dur:4000;easing:easeInOutSine"></a-plane>
+      <a-plane position="4 5 -15" width="0.6" height="0.25" color="#eeeeee" rotation="0 -20 -8"
+        animation="property:position;to:6 4.5 -13;dir:alternate;loop:true;dur:3500;easing:easeInOutSine"></a-plane>
+      <!-- Sun -->
+      <a-sphere position="-10 10 -25" radius="1.5" color="#fff5a0" material="emissive:#ffdd00;emissiveIntensity:0.6"></a-sphere>
+      <a-light type="ambient" color="#ffe8d0" intensity="0.8"></a-light>
+      <a-light type="directional" position="-10 10 -5" color="#fff8e0" intensity="1.0"></a-light>
+    `,
+
+    // ─── MOUNTAINS: Himalayan Peaks + Monastery ─────────────────
+    Mountains: `
+      <a-plane position="0 0 0" rotation="-90 0 0" width="200" height="200" color="#e8eef5"></a-plane>
+      <!-- Main peak -->
+      <a-cone position="0 5 -30" radius-bottom="14" radius-top="0.1" height="22" color="#7a8ca0" shadow></a-cone>
+      <a-cone position="0 14 -30" radius-bottom="4" radius-top="0.1" height="8" color="#f0f5ff" shadow></a-cone>
+      <!-- Left peak -->
+      <a-cone position="-16 2 -28" radius-bottom="10" radius-top="0.1" height="16" color="#6a7a90" shadow></a-cone>
+      <a-cone position="-16 9 -28" radius-bottom="3.5" radius-top="0.1" height="6" color="#dde8f5" shadow></a-cone>
+      <!-- Right peak -->
+      <a-cone position="16 2 -28" radius-bottom="10" radius-top="0.1" height="14" color="#6a7a90" shadow></a-cone>
+      <a-cone position="16 8 -28" radius-bottom="3" radius-top="0.1" height="5" color="#dde8f5" shadow></a-cone>
+      <!-- Foothills -->
+      <a-cone position="-7 0.5 -14" radius-bottom="6" radius-top="0.1" height="7" color="#88a080" shadow></a-cone>
+      <a-cone position="7 0.5 -14" radius-bottom="6" radius-top="0.1" height="7" color="#80988a" shadow></a-cone>
+      <!-- Monastery -->
+      <a-box position="0 0.5 -7" width="4" height="2" depth="2.5" color="#c8b090" shadow></a-box>
+      <a-cone position="0 2 -7" radius-bottom="2.5" radius-top="0.1" height="1.5" color="#c03020" shadow></a-cone>
+      <a-cylinder position="0 3.5 -7" radius="0.25" height="1.5" color="#d0c080" shadow></a-cylinder>
+      <a-cone position="0 4.4 -7" radius-bottom="0.4" radius-top="0.02" height="0.7" color="#e0d060" shadow></a-cone>
+      <!-- Windows & door -->
+      <a-box position="-1.2 0.7 -5.74" width="0.5" height="0.6" depth="0.05" color="#3a2800" shadow></a-box>
+      <a-box position="1.2 0.7 -5.74" width="0.5" height="0.6" depth="0.05" color="#3a2800" shadow></a-box>
+      <a-box position="0 0.4 -5.74" width="0.6" height="1.0" depth="0.05" color="#5a3a10" shadow></a-box>
+      <!-- Prayer flags -->
+      <a-cylinder position="-2.5 2.5 -7" radius="0.03" height="5" color="#888888" shadow></a-cylinder>
+      <a-plane position="-2.5 4.5 -7" width="0.6" height="0.3" color="#e03030" rotation="0 90 0"
+        animation="property:rotation;to:0 90 15;dir:alternate;loop:true;dur:1000"></a-plane>
+      <a-plane position="-2.5 4.1 -7" width="0.5" height="0.25" color="#e0e030" rotation="0 90 0"
+        animation="property:rotation;to:0 90 -12;dir:alternate;loop:true;dur:900"></a-plane>
+      <a-plane position="-2.5 3.7 -7" width="0.5" height="0.25" color="#3030e0" rotation="0 90 0"
+        animation="property:rotation;to:0 90 10;dir:alternate;loop:true;dur:1100"></a-plane>
+      <!-- Pine trees -->
+      <a-cylinder position="-3.5 0.6 -5" radius="0.1" height="1.8" color="#5a3a10" shadow></a-cylinder>
+      <a-cone position="-3.5 2 -5" radius-bottom="0.8" radius-top="0.04" height="1.8" color="#1a5520" shadow></a-cone>
+      <a-cone position="-3.5 1.5 -5" radius-bottom="1.1" radius-top="0.05" height="1.2" color="#1e6025" shadow></a-cone>
+      <a-cylinder position="3.5 0.6 -5" radius="0.1" height="1.8" color="#5a3a10" shadow></a-cylinder>
+      <a-cone position="3.5 2 -5" radius-bottom="0.8" radius-top="0.04" height="1.8" color="#1a5520" shadow></a-cone>
+      <a-cone position="3.5 1.5 -5" radius-bottom="1.1" radius-top="0.05" height="1.2" color="#1e6025" shadow></a-cone>
+      <!-- Clouds -->
+      <a-sphere position="-8 8 -20" radius="1.5" color="#f0f4ff" opacity="0.85"></a-sphere>
+      <a-sphere position="-6.5 8.2 -20" radius="1.2" color="#eef2ff" opacity="0.8"></a-sphere>
+      <a-sphere position="6 9 -22" radius="1.8" color="#f0f4ff" opacity="0.8"></a-sphere>
+      <a-light type="ambient" color="#d0dff0" intensity="0.7"></a-light>
+      <a-light type="directional" position="5 15 -5" color="#fff5f0" intensity="1.0"></a-light>
+    `,
+
+    // ─── SPACE: ISS + Moon + Saturn + Earth ──────────────────────
+    Space: `
+      ${stars}
+      <!-- Earth -->
+      <a-sphere position="-12 -4 -35" radius="10" color="#1a6fa8"
+        animation="property:rotation;to:0 360 0;loop:true;dur:60000;easing:linear"></a-sphere>
+      <a-sphere position="-12 -4 -35" radius="10.05" color="#3a8a30" opacity="0.6"></a-sphere>
+      <a-sphere position="-12 -4 -35" radius="10.3" color="#ffffff" opacity="0.15"></a-sphere>
+      <!-- Moon -->
+      <a-sphere position="14 6 -28" radius="3.5" color="#c8c8c8"
+        animation="property:rotation;to:0 360 0;loop:true;dur:80000;easing:linear"></a-sphere>
+      <a-sphere position="14.5 7.5 -24.8" radius="0.4" color="#b0b0b0"></a-sphere>
+      <a-sphere position="12.8 6.8 -24.9" radius="0.3" color="#b5b5b5"></a-sphere>
+      <!-- Saturn -->
+      <a-sphere position="0 8 -40" radius="4" color="#e8d090"
+        animation="property:rotation;to:0 360 0;loop:true;dur:45000;easing:linear"></a-sphere>
+      <a-torus position="0 8 -40" radius="6.5" radius-tubular="0.4" color="#c8b060" rotation="75 0 0" opacity="0.7"></a-torus>
+      <a-torus position="0 8 -40" radius="8" radius-tubular="0.3" color="#d0b850" rotation="75 0 0" opacity="0.5"></a-torus>
+      <a-torus position="0 8 -40" radius="9" radius-tubular="0.2" color="#b8a040" rotation="75 0 0" opacity="0.3"></a-torus>
+      <!-- ISS truss + solar panels -->
+      <a-box position="0 3 -10" width="5" height="0.15" depth="0.15" color="#c8c8c8"
+        animation="property:rotation;to:0 360 0;loop:true;dur:30000;easing:linear"></a-box>
+      <a-box position="-2 3 -10" width="1.8" height="0.05" depth="0.9" color="#1a3a8a"></a-box>
+      <a-box position="-3.6 3 -10" width="1.8" height="0.05" depth="0.9" color="#1a3a8a"></a-box>
+      <a-box position="2 3 -10" width="1.8" height="0.05" depth="0.9" color="#1a3a8a"></a-box>
+      <a-box position="3.6 3 -10" width="1.8" height="0.05" depth="0.9" color="#1a3a8a"></a-box>
+      <a-cylinder position="0 3 -10" radius="0.25" height="1.2" rotation="0 0 90" color="#e0e0e0"></a-cylinder>
+      <!-- Shooting star -->
+      <a-box position="-15 10 -20" width="0.05" height="0.05" depth="2" color="#ffffff"
+        material="emissive:#ffffff;emissiveIntensity:1"
+        animation="property:position;to:15 2 -10;loop:true;dur:3000;easing:easeInQuad;delay:4000"></a-box>
+      <!-- Galaxy -->
+      <a-torus position="-20 5 -50" radius="5" radius-tubular="1.5" color="#8040c0" opacity="0.25" rotation="70 20 0"></a-torus>
+      <a-light type="ambient" color="#101030" intensity="0.3"></a-light>
+      <a-light type="point" position="-12 -4 -20" color="#6090ff" intensity="0.8" distance="60"></a-light>
+      <a-light type="point" position="0 14 -15" color="#ffffff" intensity="0.5" distance="30"></a-light>
+    `,
+  };
+
+  return scenes[category] || scenes['Historical'];
+}
+
+function renderVRScene() {
+  const d = state.currentDest;
+  document.getElementById('vr-dest-name').textContent = d.name;
+  document.getElementById('vr-fav-btn').innerHTML = isFav(d._id) ? '❤️ Saved' : '☆ Favorite';
+  loadVRModel();
+}
+
+async function toggleVrFav() {
+  if (!state.currentDest) return;
+  const btn = document.getElementById('vr-fav-btn');
+  await toggleFav(state.currentDest._id, btn);
+}
+
+function vrFullscreen() {
+  const target = document.getElementById('vr-overlay');
+  if (target.requestFullscreen) target.requestFullscreen();
+  else if (target.webkitRequestFullscreen) target.webkitRequestFullscreen();
+  else if (target.mozRequestFullScreen) target.mozRequestFullScreen();
+  else if (target.msRequestFullscreen) target.msRequestFullscreen();
+  toast('Press ESC to exit fullscreen', 'info');
+}
+
+// ── ADMIN ────────────────────────────────────────────────
+function adminTab(btn, panelId) {
+  document.querySelectorAll('.admin-nav-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(panelId).classList.add('active');
+  if (panelId === 'admin-destinations') loadAdminDestinations();
+  if (panelId === 'admin-users') loadAdminUsers();
+}
+
+async function loadAdminData() {
+  // load stats for overview
+  try {
+    const users = await api('/auth/users');
+    const dests = await api('/destinations','GET',null,false);
+    document.getElementById('stat-users').textContent = users.count || users.users?.length || 0;
+    document.getElementById('stat-dests').textContent = dests.length || 0;
+    const blocked = (users.users||[]).filter(u=>u.isBlocked).length;
+    document.getElementById('stat-blocked').textContent = blocked;
+  } catch(e) { console.log(e); }
+}
+
+async function loadAdminDestinations() {
+  document.getElementById('admin-dest-loading').style.display='block';
+  document.getElementById('admin-dest-table').style.display='none';
+  try {
+    const dests = await api('/destinations','GET',null,false);
+    state.destinations = dests;
+    document.getElementById('admin-dest-loading').style.display='none';
+    document.getElementById('admin-dest-table').style.display='block';
+    document.getElementById('admin-dest-tbody').innerHTML = dests.map(d => `
+      <tr>
+        <td><strong>${d.name}</strong></td>
+        <td><span class="badge badge-teal">${catIcon(d.category)} ${d.category}</span></td>
+        <td>₹${d.price}</td>
+        <td>${d.duration}</td>
+        <td>${d.rating || '—'}</td>
+        <td style="display:flex;gap:.5rem;">
+          <button class="btn btn-ghost btn-sm" onclick="openEditDest('${d._id}')">✏️ Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteDest('${d._id}',this)">🗑 Delete</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) {
+    document.getElementById('admin-dest-loading').style.display='none';
+    toast(e.message,'error');
+  }
+}
+
+async function loadAdminUsers() {
+  document.getElementById('admin-users-loading').style.display='block';
+  document.getElementById('admin-users-table').style.display='none';
+  try {
+    const data = await api('/auth/users');
+    const users = data.users || [];
+    document.getElementById('admin-users-loading').style.display='none';
+    document.getElementById('admin-users-table').style.display='block';
+    document.getElementById('admin-users-tbody').innerHTML = users.map(u => {
+      const isMe = u._id === state.user?.id;
+      return `<tr>
+        <td><strong>${u.name}</strong></td>
+        <td>${u.email}</td>
+        <td><span class="badge ${u.role==='admin'?'badge-purple':'badge-teal'}">${u.role==='admin'?'👑 Admin':'🌍 User'}</span></td>
+        <td><span class="badge ${u.isBlocked?'badge-red':'badge-green'}">${u.isBlocked?'Blocked':'Active'}</span></td>
+        <td style="display:flex;gap:.5rem;">
+          ${!isMe ? `
+            ${u.isBlocked
+              ? `<button class="btn btn-ghost btn-sm" onclick="unblockUser('${u._id}',this)">✅ Unblock</button>`
+              : `<button class="btn btn-purple btn-sm" onclick="blockUser('${u._id}',this)">🔴 Block</button>`}
+            <button class="btn btn-danger btn-sm" onclick="deleteUser('${u._id}',this)">🗑</button>
+          ` : '<span style="color:var(--muted);font-size:.8rem;">You</span>'}
+        </td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('admin-users-loading').style.display='none';
+    toast(e.message,'error');
+  }
+}
+
+async function blockUser(userId, btn) {
+  btn.disabled = true;
+  try {
+    await api(`/auth/block-user/${userId}`,'PATCH');
+    toast('User blocked','info');
+    loadAdminUsers();
+  } catch(e) { toast(e.message,'error'); btn.disabled=false; }
+}
+
+async function unblockUser(userId, btn) {
+  btn.disabled = true;
+  try {
+    await api(`/auth/unblock-user/${userId}`,'PATCH');
+    toast('User unblocked','success');
+    loadAdminUsers();
+  } catch(e) { toast(e.message,'error'); btn.disabled=false; }
+}
+
+async function deleteUser(userId, btn) {
+  if (!confirm('Delete this user permanently?')) return;
+  btn.disabled = true;
+  try {
+    await api(`/auth/delete-user/${userId}`,'DELETE');
+    toast('User deleted','success');
+    loadAdminUsers();
+  } catch(e) { toast(e.message,'error'); btn.disabled=false; }
+}
+
+// DESTINATION CRUD (Admin)
+function openDestModal() {
+  document.getElementById('dest-modal-title').textContent = 'Add Destination';
+  document.getElementById('dest-edit-id').value = '';
+  ['dest-name','dest-desc','dest-image','dest-price','dest-duration'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('dest-cat').value = '';
+  document.getElementById('dest-save-btn').textContent = 'Save';
+  openModal('modal-dest');
+}
+
+function openEditDest(id) {
+  const d = state.destinations.find(x => x._id === id);
+  if (!d) return;
+  document.getElementById('dest-modal-title').textContent = 'Edit Destination';
+  document.getElementById('dest-edit-id').value = d._id;
+  document.getElementById('dest-name').value = d.name;
+  document.getElementById('dest-desc').value = d.description;
+  document.getElementById('dest-cat').value = d.category;
+  document.getElementById('dest-price').value = d.price;
+  document.getElementById('dest-duration').value = d.duration;
+  document.getElementById('dest-image').value = d.image || '';
+  document.getElementById('dest-save-btn').textContent = 'Update';
+  openModal('modal-dest');
+}
+
+async function saveDestination() {
+  const editId = document.getElementById('dest-edit-id').value;
+  const body = {
+    name: document.getElementById('dest-name').value.trim(),
+    description: document.getElementById('dest-desc').value.trim(),
+    category: document.getElementById('dest-cat').value,
+    price: Number(document.getElementById('dest-price').value),
+    duration: document.getElementById('dest-duration').value.trim(),
+    image: document.getElementById('dest-image').value.trim(),
+  };
+  if (!body.name || !body.description || !body.category || !body.price || !body.duration) {
+    toast('Please fill all required fields','error'); return;
+  }
+  setBtn('dest-save-btn',true,'Saving…');
+  try {
+    if (editId) {
+      await api(`/destinations/${editId}`,'PUT',body);
+      toast('Destination updated ✅','success');
+    } else {
+      await api('/destinations','POST',body);
+      toast('Destination added ✅','success');
+    }
+    closeModal('modal-dest');
+    loadAdminDestinations();
+  } catch(e) { toast(e.message,'error'); }
+  finally { setBtn('dest-save-btn',false, editId?'Update':'Save'); }
+}
+
+async function deleteDest(id, btn) {
+  if (!confirm('Delete this destination permanently?')) return;
+  btn.disabled = true;
+  try {
+    await api(`/destinations/${id}`,'DELETE');
+    toast('Destination deleted','success');
+    loadAdminDestinations();
+  } catch(e) { toast(e.message,'error'); btn.disabled=false; }
+}
+
+// ── INIT ─────────────────────────────────────────────────
+(function init() {
+  // Close modals on backdrop click
+  document.querySelectorAll('.modal-bg').forEach(bg => {
+    bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('open'); });
+  });
+
+  // Enter key on login
+  document.getElementById('login-pass')?.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+  document.getElementById('login-email')?.addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+  if (state.token && state.user) {
+    renderNav();
+    navigate('hub');
+  } else {
+    navigate('landing');
+  }
+})();
+</script>
+</body>
+</html>
